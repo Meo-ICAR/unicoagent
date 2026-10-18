@@ -9,7 +9,7 @@ use Carbon\Carbon;
 use Unico\Core\Support\ResidenceResolver;
 
 /**
- * Formato unico con cui la pratica viene consegnata a un CRM che non ha un tracciato proprio (driver generico, unicoloan...).
+ * Formato unico con cui la pratica viene consegnata a un CRM che non ha un tracciato proprio (driver generico, unicofinance...).
  * Solo dati semplici: nessun contenuto di file. I driver con un tracciato fisso (Mediafacile) ne costruiscono uno loro.
  */
 final class SubmissionPayload

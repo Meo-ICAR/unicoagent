@@ -10,7 +10,7 @@ use App\Models\PraticaDocument;
 use App\Services\Crm\Capabilities\SendsDocuments;
 use App\Services\Crm\CrmGateway;
 use App\Services\Crm\CrmRegistry;
-use App\Services\Crm\UnicoloanGateway;
+use App\Services\Crm\UnicofinanceGateway;
 use Database\Seeders\DocumentCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
@@ -20,15 +20,15 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
-class UnicoloanGatewayTest extends TestCase
+class UnicofinanceGatewayTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const BASE = 'https://unicoloan.example.com';
+    private const BASE = 'https://unicofinance.example.com';
 
     private function company(array $config = []): Company
     {
-        return Company::create(['name' => 'H', 'crm_driver' => 'unicoloan', 'crm_config' => $config + ['url' => self::BASE, 'token' => 'TOK', 'secret' => 'SEG']]);
+        return Company::create(['name' => 'H', 'crm_driver' => 'unicofinance', 'crm_config' => $config + ['url' => self::BASE, 'token' => 'TOK', 'secret' => 'SEG']]);
     }
 
     private function loan(array $override = []): LoanRequest
@@ -44,9 +44,9 @@ class UnicoloanGatewayTest extends TestCase
         return $override + ['cognome' => 'Rossi', 'nome' => 'Mario', 'codice_fiscale' => 'RSSMRA80A01H501U', 'data_nascita' => '01/02/1980', 'residenza' => 'Via Roma 1, Milano', 'telefono' => '+393331234567', 'email' => 'mario@example.com'];
     }
 
-    private function gateway(?Company $company = null): UnicoloanGateway
+    private function gateway(?Company $company = null): UnicofinanceGateway
     {
-        return new UnicoloanGateway($company ?? $this->company());
+        return new UnicofinanceGateway($company ?? $this->company());
     }
 
     private function agent(): void
@@ -68,15 +68,15 @@ class UnicoloanGatewayTest extends TestCase
     {
         $registry = app(CrmRegistry::class);
 
-        $this->assertTrue($registry->has('unicoloan'));
-        $this->assertTrue($registry->supports('unicoloan', SendsDocuments::class));
-        $this->assertInstanceOf(UnicoloanGateway::class, $registry->make('unicoloan', $this->company()));
+        $this->assertTrue($registry->has('unicofinance'));
+        $this->assertTrue($registry->supports('unicofinance', SendsDocuments::class));
+        $this->assertInstanceOf(UnicofinanceGateway::class, $registry->make('unicofinance', $this->company()));
     }
 
     public function test_la_richiesta_e_firmata_e_porta_cliente_pratica_e_agente(): void
     {
         $this->agent();
-        Http::fake(['unicoloan.example.com/*' => Http::response(['codice_pratica' => 'WA-FIN-2026-0300'], 201)]);
+        Http::fake(['unicofinance.example.com/*' => Http::response(['codice_pratica' => 'WA-FIN-2026-0300'], 201)]);
 
         $this->assertSame(200, $this->gateway()->submit($loan = $this->loan(), $this->personal()));
         $this->assertSame('WA-FIN-2026-0300', $loan->fresh()->crm_lead_id);
@@ -96,10 +96,10 @@ class UnicoloanGatewayTest extends TestCase
         });
     }
 
-    public function test_gli_errori_di_unicoloan_si_riportano_per_riprovare(): void
+    public function test_gli_errori_di_unicofinance_si_riportano_per_riprovare(): void
     {
         $this->agent();
-        Http::fake(['unicoloan.example.com/*' => Http::sequence()->push(['codice' => 'cliente_di_altro_agente'], 409)->push([], 500)]);
+        Http::fake(['unicofinance.example.com/*' => Http::sequence()->push(['codice' => 'cliente_di_altro_agente'], 409)->push([], 500)]);
 
         $this->assertSame(409, $this->gateway()->submit($loan = $this->loan(), $this->personal()));
         $this->assertSame(500, $this->gateway()->submit($loan, $this->personal()));
@@ -127,13 +127,13 @@ class UnicoloanGatewayTest extends TestCase
     {
         $this->agent();
         Http::fake();
-        $incomplete = Company::create(['name' => 'X', 'crm_driver' => 'unicoloan', 'crm_config' => ['url' => self::BASE]]);
-        $insecure = Company::create(['name' => 'Y', 'crm_driver' => 'unicoloan', 'crm_config' => ['url' => 'http://unicoloan.example.com', 'token' => 't', 'secret' => 's']]);
+        $incomplete = Company::create(['name' => 'X', 'crm_driver' => 'unicofinance', 'crm_config' => ['url' => self::BASE]]);
+        $insecure = Company::create(['name' => 'Y', 'crm_driver' => 'unicofinance', 'crm_config' => ['url' => 'http://unicofinance.example.com', 'token' => 't', 'secret' => 's']]);
         $this->app['env'] = 'production';
 
         foreach ([$incomplete, $insecure] as $company) {
-            $this->assertSame(0, (new UnicoloanGateway($company))->submit($this->loan(['code' => 'FIN-'.$company->id]), $this->personal()));
-            $this->assertSame(0, (new UnicoloanGateway($company))->sendDocuments($this->loan(['code' => 'DOC-'.$company->id])));
+            $this->assertSame(0, (new UnicofinanceGateway($company))->submit($this->loan(['code' => 'FIN-'.$company->id]), $this->personal()));
+            $this->assertSame(0, (new UnicofinanceGateway($company))->sendDocuments($this->loan(['code' => 'DOC-'.$company->id])));
         }
         Http::assertNothingSent();
     }
@@ -146,7 +146,7 @@ class UnicoloanGatewayTest extends TestCase
         PraticaDocument::populate($loan);
         $a = $this->attach($loan, 'documento_identita', '%PDF-1.4 identita');
         $this->attach($loan, 'codice_fiscale', '%PDF-1.4 cf');
-        Http::fake(['unicoloan.example.com/*' => Http::response(['id' => 1], 201)]);
+        Http::fake(['unicofinance.example.com/*' => Http::response(['id' => 1], 201)]);
 
         $this->assertSame(200, $this->gateway()->sendDocuments($loan));
 
@@ -170,7 +170,7 @@ class UnicoloanGatewayTest extends TestCase
         Storage::fake('local');
         $loan = $this->loan();
         $this->attach($loan, 'documento_identita');
-        Http::fake(['unicoloan.example.com/*' => Http::response([], 201)]);
+        Http::fake(['unicofinance.example.com/*' => Http::response([], 201)]);
 
         $this->gateway($this->company(['analysis' => 'full']))->sendDocuments($loan);
 
@@ -183,7 +183,7 @@ class UnicoloanGatewayTest extends TestCase
         $loan = $this->loan();
         $this->attach($loan, 'documento_identita', '%PDF-1.4 uno');
         $this->attach($loan, 'codice_fiscale', '%PDF-1.4 due');
-        Http::fake(['unicoloan.example.com/*' => Http::sequence()->push([], 201)->push([], 503)->push([], 201)]);
+        Http::fake(['unicofinance.example.com/*' => Http::sequence()->push([], 201)->push([], 503)->push([], 201)]);
 
         $this->assertSame(503, $this->gateway()->sendDocuments($loan));
         $this->assertSame(1, $loan->attachments()->whereNotNull('crm_sent_at')->count());
@@ -216,7 +216,7 @@ class UnicoloanGatewayTest extends TestCase
         $this->company();
         $loan = $this->loan();
         $this->attach($loan, 'documento_identita');
-        Http::fake(['unicoloan.example.com/*' => Http::response([], 500)]);
+        Http::fake(['unicofinance.example.com/*' => Http::response([], 500)]);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('codice 500');
@@ -234,7 +234,7 @@ class UnicoloanGatewayTest extends TestCase
         Http::assertNothingSent();
 
         $test = $this->loan(['code' => 'FIN-T', 'is_test' => true]);
-        Company::query()->update(['crm_driver' => 'unicoloan', 'crm_config' => ['url' => self::BASE, 'token' => 't', 'secret' => 's']]);
+        Company::query()->update(['crm_driver' => 'unicofinance', 'crm_config' => ['url' => self::BASE, 'token' => 't', 'secret' => 's']]);
         (new SendDocumentsToCrm($test->id))->handle(app(CrmRegistry::class));
         Http::assertNothingSent();
     }
@@ -256,12 +256,12 @@ class UnicoloanGatewayTest extends TestCase
         Bus::assertDispatched(SendDocumentsToCrm::class, fn ($job) => $job->loanId === $withPending->id);
     }
 
-    public function test_il_gateway_dell_applicazione_usa_unicoloan_quando_l_azienda_lo_sceglie(): void
+    public function test_il_gateway_dell_applicazione_usa_unicofinance_quando_l_azienda_lo_sceglie(): void
     {
         $this->agent();
         $this->company();
         config(['finanziamento.crm.driver' => 'production']);
-        Http::fake(['unicoloan.example.com/*' => Http::response(['codice_pratica' => 'WA-X'], 201)]);
+        Http::fake(['unicofinance.example.com/*' => Http::response(['codice_pratica' => 'WA-X'], 201)]);
 
         $this->assertSame(200, app(CrmGateway::class)->submit($this->loan(), $this->personal()));
         Http::assertSentCount(1);
@@ -272,7 +272,7 @@ class UnicoloanGatewayTest extends TestCase
         $registry = app(CrmRegistry::class);
 
         foreach ([\App\Services\Crm\Capabilities\ProvidesTemplates::class, \App\Services\Crm\Capabilities\FillsForms::class, \App\Services\Crm\Capabilities\RequestsSignature::class] as $capability) {
-            $this->assertTrue($registry->supports('unicoloan', $capability));
+            $this->assertTrue($registry->supports('unicofinance', $capability));
         }
     }
 
@@ -328,5 +328,15 @@ class UnicoloanGatewayTest extends TestCase
         $this->assertNull($gateway->fillForm($loan, '7'));
         $this->assertSame(['status' => 'errore', 'reference' => null], $gateway->requestSignature($loan, '7'));
         $this->assertSame('errore', $gateway->signatureStatus($loan, 'doc-1')['status']);
+    }
+
+    public function test_le_aziende_con_il_driver_unicoloan_passano_a_unicofinance(): void
+    {
+        $company = Company::create(['name' => 'Z', 'crm_driver' => 'unicoloan', 'crm_config' => ['url' => self::BASE, 'token' => 't', 'secret' => 's']]);
+
+        (require database_path('migrations/2026_10_18_160000_switch_unicoloan_crm_driver_to_unicofinance.php'))->up();
+
+        $this->assertSame('unicofinance', $company->fresh()->crm_driver);
+        $this->assertSame(self::BASE, $company->fresh()->crm_config['url']);
     }
 }

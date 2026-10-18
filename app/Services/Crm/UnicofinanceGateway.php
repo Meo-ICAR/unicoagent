@@ -9,7 +9,7 @@ use App\Services\Crm\Capabilities\FillsForms;
 use App\Services\Crm\Capabilities\ProvidesTemplates;
 use App\Services\Crm\Capabilities\RequestsSignature;
 use App\Services\Crm\Capabilities\SendsDocuments;
-use App\Services\Crm\Unicoloan\UnicoloanClient;
+use App\Services\Crm\Unicofinance\UnicofinanceClient;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
@@ -18,23 +18,23 @@ use Unico\Core\Pdf\ModulePrinter;
 use Unico\Core\Pdf\PdfFormException;
 
 /**
- * Consegna la richiesta a unicoloan (API /api/agente/v1): prima cliente e pratica (submit, sincrono), poi i documenti
+ * Consegna la richiesta a unicofinance (API /api/agente/v1): prima cliente e pratica (submit, sincrono), poi i documenti
  * (sendDocuments, da un job in coda). Gli invii sono idempotenti per codice della richiesta: ripeterli non duplica nulla.
  * Nei log solo il tipo di errore e i codici: mai dati personali.
  */
-class UnicoloanGateway implements CrmGateway, SendsDocuments, ProvidesTemplates, FillsForms, RequestsSignature
+class UnicofinanceGateway implements CrmGateway, SendsDocuments, ProvidesTemplates, FillsForms, RequestsSignature
 {
-    private UnicoloanClient $client;
+    private UnicofinanceClient $client;
 
     public function __construct(private Company $company)
     {
-        $this->client = new UnicoloanClient($company);
+        $this->client = new UnicofinanceClient($company);
     }
 
     public function submit(LoanRequest $loan, array $personal): int
     {
         if (! $this->client->isConfigured()) {
-            Log::warning('unicoloan: indirizzo, token o segreto mancanti', ['loan' => $loan->code]);
+            Log::warning('unicofinance: indirizzo, token o segreto mancanti', ['loan' => $loan->code]);
 
             return 0;
         }
@@ -42,7 +42,7 @@ class UnicoloanGateway implements CrmGateway, SendsDocuments, ProvidesTemplates,
         $payload = SubmissionPayload::build($loan, $personal);
 
         if (blank($payload['cliente']['codice_fiscale'] ?? null) || blank($payload['agente']['partita_iva'] ?? null)) {
-            Log::warning('unicoloan: codice fiscale del cliente o partita IVA dell\'agente mancanti', ['loan' => $loan->code]);
+            Log::warning('unicofinance: codice fiscale del cliente o partita IVA dell\'agente mancanti', ['loan' => $loan->code]);
 
             return 422;
         }
@@ -50,13 +50,13 @@ class UnicoloanGateway implements CrmGateway, SendsDocuments, ProvidesTemplates,
         try {
             $response = $this->client->json('POST', '/api/agente/v1/richieste', $payload);
         } catch (ConnectionException) {
-            Log::error('unicoloan: servizio non raggiungibile', ['loan' => $loan->code]);
+            Log::error('unicofinance: servizio non raggiungibile', ['loan' => $loan->code]);
 
             return 0;
         }
 
         if (! $response->successful()) {
-            Log::warning('unicoloan: richiesta rifiutata', ['loan' => $loan->code, 'status' => $response->status(), 'codice' => $response->json('codice')]);
+            Log::warning('unicofinance: richiesta rifiutata', ['loan' => $loan->code, 'status' => $response->status(), 'codice' => $response->json('codice')]);
 
             return $response->status() ?: 502;
         }
@@ -96,7 +96,7 @@ class UnicoloanGateway implements CrmGateway, SendsDocuments, ProvidesTemplates,
     }
 
     /**
-     * Moduli che unicoloan mette a disposizione per questa pratica. Il «codice» è l'id del modulo in unicoloan.
+     * Moduli che unicofinance mette a disposizione per questa pratica. Il «codice» è l'id del modulo in unicofinance.
      *
      * @return list<array{code: string, name: string}>
      */
@@ -116,7 +116,7 @@ class UnicoloanGateway implements CrmGateway, SendsDocuments, ProvidesTemplates,
         return $response?->successful() ? $response->body() : null;
     }
 
-    /** Il modulo (id in unicoloan) compilato da unico-core con i dati della pratica, pronto da stampare. */
+    /** Il modulo (id in unicofinance) compilato da unico-core con i dati della pratica, pronto da stampare. */
     public function fillForm(LoanRequest $loan, string $template): ?string
     {
         try {
@@ -132,7 +132,7 @@ class UnicoloanGateway implements CrmGateway, SendsDocuments, ProvidesTemplates,
 
     /**
      * Compila il modulo ($document = codice del modulo) e chiede la firma con OTP al cliente e all'agente.
-     * Il «reference» restituito è l'id del documento in unicoloan: serve a signatureStatus().
+     * Il «reference» restituito è l'id del documento in unicofinance: serve a signatureStatus().
      */
     public function requestSignature(LoanRequest $loan, string $document): array
     {
@@ -180,13 +180,13 @@ class UnicoloanGateway implements CrmGateway, SendsDocuments, ProvidesTemplates,
         try {
             $response = $this->client->json($method, $path, $body);
         } catch (ConnectionException) {
-            Log::error('unicoloan: servizio non raggiungibile', ['loan' => $loan->code]);
+            Log::error('unicofinance: servizio non raggiungibile', ['loan' => $loan->code]);
 
             return null;
         }
 
         if (! $response->successful()) {
-            Log::warning('unicoloan: chiamata rifiutata', ['loan' => $loan->code, 'status' => $response->status(), 'codice' => $response->json('codice')]);
+            Log::warning('unicofinance: chiamata rifiutata', ['loan' => $loan->code, 'status' => $response->status(), 'codice' => $response->json('codice')]);
         }
 
         return $response;
@@ -219,13 +219,13 @@ class UnicoloanGateway implements CrmGateway, SendsDocuments, ProvidesTemplates,
                 $contents,
             );
         } catch (ConnectionException) {
-            Log::error('unicoloan: servizio non raggiungibile (documento)', ['loan' => $loan->code, 'attachment' => $attachment->id]);
+            Log::error('unicofinance: servizio non raggiungibile (documento)', ['loan' => $loan->code, 'attachment' => $attachment->id]);
 
             return 0;
         }
 
         if (! $response->successful()) {
-            Log::warning('unicoloan: documento rifiutato', ['loan' => $loan->code, 'attachment' => $attachment->id, 'status' => $response->status(), 'codice' => $response->json('codice')]);
+            Log::warning('unicofinance: documento rifiutato', ['loan' => $loan->code, 'attachment' => $attachment->id, 'status' => $response->status(), 'codice' => $response->json('codice')]);
 
             return $response->status() ?: 502;
         }

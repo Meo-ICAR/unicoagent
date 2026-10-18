@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Crm\Unicoloan;
+namespace App\Services\Crm\Unicofinance;
 
 use App\Models\Company;
 use Illuminate\Http\Client\ConnectionException;
@@ -8,10 +8,11 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 /**
- * Client dell'API in ingresso di unicoloan (/api/agente/v1): token Bearer e firma HMAC-SHA256 di
- * «timestamp.METODO.percorso.sha256-del-contenuto» (il corpo JSON, o il file nei caricamenti). Vedi unicoloan docs/agent-api.md.
+ * Client dell'API in ingresso di unicofinance (/api/agente/v1): token Bearer e firma HMAC-SHA256 di
+ * «timestamp.METODO.percorso.sha256-del-contenuto» (il corpo JSON, o il file nei caricamenti). Vedi il README di unicofinance
+ * («API per le altre app della suite») e il suo config/agent_api.php.
  */
-class UnicoloanClient
+class UnicofinanceClient
 {
     public function __construct(private readonly Company $company) {}
 
