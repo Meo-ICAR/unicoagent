@@ -3,13 +3,16 @@
 namespace App\Models;
 
 use App\Jobs\AnalyzeAttachment;
+use App\Jobs\SyncCrmRequest;
 use App\Models\Concerns\BelongsToCompany;
 use App\Services\Flows\FlowRepository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Unico\Core\Models\Document;
 
 class LoanRequest extends Model
 {
@@ -43,9 +46,9 @@ class LoanRequest extends Model
 
     /** Le relazioni morph dei Document del core non devono caricare la pratica sulla connessione del core (lì non c'è la tabella). */
     /** Documenti prodotti con unico-core (Document del core agganciati con l'alias `loan_request`). */
-    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    public function documents(): MorphMany
     {
-        return $this->morphMany(\Unico\Core\Models\Document::class, 'documentable');
+        return $this->morphMany(Document::class, 'documentable');
     }
 
     public function getConnectionName(): ?string
@@ -143,6 +146,7 @@ class LoanRequest extends Model
     {
         if (! $this->privacy_verified_at) {
             $this->update(['privacy_verified_at' => now()]);
+            SyncCrmRequest::consent($this);
         }
 
         $this->attachments()->where('status', 'in_attesa_informativa')->get()
@@ -152,7 +156,10 @@ class LoanRequest extends Model
     /** L'informativa è stata rifiutata: i documenti già letti restano, quelli nuovi aspetteranno un'informativa valida. */
     public function revokePrivacy(): void
     {
-        $this->update(['privacy_verified_at' => null]);
+        if ($this->privacy_verified_at) {
+            $this->update(['privacy_verified_at' => null]);
+            SyncCrmRequest::consent($this);
+        }
     }
 
     /**
@@ -175,6 +182,7 @@ class LoanRequest extends Model
             ],
         );
         $slot->requestIntegration($note, $userId);
+        SyncCrmRequest::note($this, "Chiesto al cliente il documento integrativo «{$slot->name}»: {$note}", 'istruttore', "integrazione:{$slot->id}:".now()->timestamp);
 
         return $slot->fresh();
     }
