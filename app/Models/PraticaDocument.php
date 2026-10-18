@@ -91,18 +91,18 @@ class PraticaDocument extends Model
     }
 
     /** L'operatore rifiuta il documento: la nota dice all'agente cosa non va. */
-    public function reject(string $note, int $userId): void
+    public function reject(string $note, ?int $userId): void
     {
         $this->review('rejected', $note, $userId);
     }
 
     /** L'operatore chiede un approfondimento su questo documento. */
-    public function requestIntegration(string $note, int $userId): void
+    public function requestIntegration(string $note, ?int $userId): void
     {
         $this->review('integrazione_richiesta', $note, $userId);
     }
 
-    private function review(string $status, string $note, int $userId): void
+    private function review(string $status, string $note, ?int $userId): void
     {
         $note = trim($note);
         if ($note === '') {

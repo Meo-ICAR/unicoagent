@@ -168,11 +168,21 @@ class LoanRequest extends Model
      */
     public function requestIntegrativeDocument(?string $catalogCode, string $name, string $note, int $userId): PraticaDocument
     {
+        $slot = $this->integrativeSlot($catalogCode, $name);
+        $slot->requestIntegration($note, $userId);
+        SyncCrmRequest::note($this, "Chiesto al cliente il documento integrativo «{$slot->name}»: {$note}", 'istruttore', "integrazione:{$slot->id}:".now()->timestamp);
+
+        return $slot->fresh();
+    }
+
+    /** Il documento integrativo con questo codice del catalogo (o con questo nome), creato se manca. */
+    public function integrativeSlot(?string $catalogCode, string $name): PraticaDocument
+    {
         $template = $catalogCode
             ? FinanziamentoDocument::where('product', $this->product)->where('code', $catalogCode)->first()
             : null;
 
-        $slot = $this->praticaDocuments()->firstOrCreate(
+        return $this->praticaDocuments()->firstOrCreate(
             ['code' => $template?->code ?? Str::slug($name)],
             [
                 'name' => $template?->name ?? $name,
@@ -181,10 +191,6 @@ class LoanRequest extends Model
                 'sort_order' => 900,
             ],
         );
-        $slot->requestIntegration($note, $userId);
-        SyncCrmRequest::note($this, "Chiesto al cliente il documento integrativo «{$slot->name}»: {$note}", 'istruttore', "integrazione:{$slot->id}:".now()->timestamp);
-
-        return $slot->fresh();
     }
 
     /** Tutti i documenti obbligatori sono OK e non c'è nessuna integrazione richiesta e non ancora ricevuta. */
