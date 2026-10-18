@@ -129,4 +129,12 @@ class UnicofinanceEventTest extends TestCase
         $this->send($this->event(['event_id' => 'r:9', 'evento' => 'documento.richiesto', 'documento' => ['tipo' => 'cud-zz', 'alias' => ['cud'], 'nome' => 'CUD']]))
             ->assertOk()->assertJsonPath('documento', 'cud');
     }
+
+    public function test_a_type_longer_than_the_column_is_cut_to_forty_characters(): void
+    {
+        $tipo = str_repeat('estratto-conto-', 5);
+
+        $this->send($this->event(['event_id' => 'r:40', 'evento' => 'documento.richiesto', 'documento' => ['tipo' => $tipo, 'alias' => [], 'nome' => 'Estratto conto']]))
+            ->assertOk()->assertJsonPath('documento', substr($tipo, 0, 40));
+    }
 }
