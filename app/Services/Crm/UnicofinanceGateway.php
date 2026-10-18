@@ -108,6 +108,13 @@ class UnicofinanceGateway implements CrmGateway, FillsForms, ProvidesTemplates, 
             return 0;
         }
 
+        if (! $this->client->isConfigured()) {
+            // Configurazione mancante: non è un errore di rete, ritentare non serve.
+            Log::warning('unicofinance: indirizzo, token o segreto mancanti', ['loan' => $loan->code]);
+
+            return 422;
+        }
+
         $response = $this->call('PATCH', $this->base($loan), $loan, $changes);
 
         return $response === null ? 0 : ($response->successful() ? 200 : $response->status());
@@ -120,12 +127,19 @@ class UnicofinanceGateway implements CrmGateway, FillsForms, ProvidesTemplates, 
             return 0;
         }
 
+        if (! $this->client->isConfigured()) {
+            // Configurazione mancante: non è un errore di rete, ritentare non serve.
+            Log::warning('unicofinance: indirizzo, token o segreto mancanti', ['loan' => $loan->code]);
+
+            return 422;
+        }
+
         $response = $this->call('POST', $this->base($loan).'/note', $loan, array_filter([
             'testo' => $text,
             'autore' => $author,
             'inviata_il' => now()->toIso8601String(),
             'id_origine' => $originId,
-        ]));
+        ], fn ($value): bool => $value !== null));
 
         return $response === null ? 0 : ($response->successful() ? 200 : $response->status());
     }

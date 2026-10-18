@@ -303,8 +303,43 @@ class UnicofinanceGatewayTest extends TestCase
                 && hash_equals($expected, $request->header('X-Signature')[0])
                 && array_key_exists('privacy_verificata_il', $request['consenso']) && $request['consenso']['privacy_verificata_il'] === null;
         });
-        Http::assertSent(fn (Request $request) => $request->method() === 'POST' && $request->url() === self::BASE.'/api/agente/v1/richieste/FIN-2026-0300/note'
-            && $request['testo'] === 'Chiamare dopo le 18' && $request['autore'] === 'agente' && $request['id_origine'] === 'nota-1');
+        Http::assertSent(function (Request $request) {
+            $expected = hash_hmac('sha256', implode('.', [$request->header('X-Timestamp')[0], 'POST', '/api/agente/v1/richieste/FIN-2026-0300/note', hash('sha256', $request->body())]), 'SEG');
+
+            return $request->method() === 'POST' && $request->url() === self::BASE.'/api/agente/v1/richieste/FIN-2026-0300/note'
+                && hash_equals($expected, $request->header('X-Signature')[0])
+                && $request['testo'] === 'Chiamare dopo le 18' && $request['autore'] === 'agente' && $request['id_origine'] === 'nota-1';
+        });
+    }
+
+    public function test_senza_configurazione_aggiornamenti_e_note_non_si_ritentano(): void
+    {
+        Http::fake();
+        $company = $this->company(['url' => '', 'token' => '', 'secret' => '']);
+        $loan = $this->loan(['crm_lead_id' => 'WA-FIN-2026-0300']);
+
+        $this->assertSame(422, $this->gateway($company)->sendNote($loan, 'x', 'agente'));
+        (new SyncCrmRequest($loan->id, 'nota', ['testo' => 'x', 'autore' => 'agente']))->handle(app(CrmRegistry::class));
+        Http::assertNothingSent();
+    }
+
+    public function test_anche_la_richiesta_di_integrazione_su_un_documento_arriva_come_nota(): void
+    {
+        Bus::fake([SyncCrmRequest::class]);
+        $loan = $this->loan(['crm_lead_id' => 'WA-FIN-2026-0300']);
+        $slot = $loan->praticaDocuments()->create(['code' => 'busta_paga', 'name' => 'Busta paga', 'requirement' => 'obbligatorio', 'status' => 'ricevuto']);
+
+        $slot->requestIntegration('Manca la seconda pagina', 1);
+        $slot->requestIntegration('Ancora illeggibile', 1);
+
+        Bus::assertDispatchedTimes(SyncCrmRequest::class, 2);
+        $ids = [];
+        Bus::assertDispatched(SyncCrmRequest::class, function (SyncCrmRequest $job) use (&$ids): bool {
+            $ids[] = $job->note['id_origine'];
+
+            return str_contains($job->note['testo'], 'Busta paga');
+        });
+        $this->assertCount(2, array_unique($ids));
     }
 
     public function test_informativa_verificata_o_rifiutata_dopo_la_consegna_aggiorna_i_consensi(): void

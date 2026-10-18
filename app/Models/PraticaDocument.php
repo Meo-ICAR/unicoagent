@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Jobs\SyncCrmRequest;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 /** Un documento atteso (o richiesto) per una pratica, con il suo stato e le annotazioni di AI e operatore. */
 class PraticaDocument extends Model
@@ -96,10 +98,17 @@ class PraticaDocument extends Model
         $this->review('rejected', $note, $userId);
     }
 
-    /** L'operatore chiede un approfondimento su questo documento. */
-    public function requestIntegration(string $note, ?int $userId): void
+    /**
+     * L'operatore chiede un approfondimento su questo documento. Se la pratica è già nel CRM la richiesta arriva anche lì
+     * come nota per l'istruttore; `$tellCrm` falso quando la richiesta viene proprio dal CRM.
+     */
+    public function requestIntegration(string $note, ?int $userId, bool $tellCrm = true): void
     {
         $this->review('integrazione_richiesta', $note, $userId);
+
+        if ($tellCrm) {
+            SyncCrmRequest::note($this->loanRequest, "Chiesto al cliente il documento «{$this->name}»: ".trim($note), 'istruttore', "integrazione:{$this->id}:".Str::uuid());
+        }
     }
 
     private function review(string $status, string $note, ?int $userId): void

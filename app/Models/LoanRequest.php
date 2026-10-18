@@ -170,7 +170,6 @@ class LoanRequest extends Model
     {
         $slot = $this->integrativeSlot($catalogCode, $name);
         $slot->requestIntegration($note, $userId);
-        SyncCrmRequest::note($this, "Chiesto al cliente il documento integrativo «{$slot->name}»: {$note}", 'istruttore', "integrazione:{$slot->id}:".now()->timestamp);
 
         return $slot->fresh();
     }

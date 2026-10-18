@@ -92,7 +92,7 @@ class UnicofinanceEventController extends Controller
             : 'Richiesto dall\'istruttoria (unicofinance).';
 
         // Nessuna nota di ritorno a unicofinance: l'avviso viene da lì.
-        $status === 'rejected' ? $slot->reject($note, null) : $slot->requestIntegration($note, null);
+        $status === 'rejected' ? $slot->reject($note, null) : $slot->requestIntegration($note, null, tellCrm: false);
 
         return $slot->fresh();
     }
