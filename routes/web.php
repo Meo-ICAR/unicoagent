@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\CompanySwitchController;
+use App\Http\Controllers\UnicofinanceEventController;
 use App\Http\Controllers\WhatsAppController;
 use App\Models\Company;
 use App\Services\Conversation\FlowGraph;
@@ -9,7 +11,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/api/whatsapp/webhook', [WhatsAppController::class, 'verifyWebhook']);
 Route::post('/api/whatsapp/webhook', [WhatsAppController::class, 'handleWebhook']);
 
-Route::post('/admin/company-switch', \App\Http\Controllers\CompanySwitchController::class)->middleware('web')->name('company.switch');
+Route::post('/api/unicofinance/eventi', UnicofinanceEventController::class)->middleware('throttle:120,1')->name('unicofinance.eventi');
+
+Route::post('/admin/company-switch', CompanySwitchController::class)->middleware('web')->name('company.switch');
 
 Route::get('/', function () {
     return view('welcome');

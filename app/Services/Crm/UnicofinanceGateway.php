@@ -9,9 +9,12 @@ use App\Services\Crm\Capabilities\FillsForms;
 use App\Services\Crm\Capabilities\ProvidesTemplates;
 use App\Services\Crm\Capabilities\RequestsSignature;
 use App\Services\Crm\Capabilities\SendsDocuments;
+use App\Services\Crm\Capabilities\SendsNotes;
+use App\Services\Crm\Capabilities\UpdatesRequest;
 use App\Services\Crm\Unicofinance\UnicofinanceClient;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Unico\Core\Pdf\ModulePrinter;
@@ -22,7 +25,7 @@ use Unico\Core\Pdf\PdfFormException;
  * (sendDocuments, da un job in coda). Gli invii sono idempotenti per codice della richiesta: ripeterli non duplica nulla.
  * Nei log solo il tipo di errore e i codici: mai dati personali.
  */
-class UnicofinanceGateway implements CrmGateway, SendsDocuments, ProvidesTemplates, FillsForms, RequestsSignature
+class UnicofinanceGateway implements CrmGateway, FillsForms, ProvidesTemplates, RequestsSignature, SendsDocuments, SendsNotes, UpdatesRequest
 {
     private UnicofinanceClient $client;
 
@@ -93,6 +96,52 @@ class UnicofinanceGateway implements CrmGateway, SendsDocuments, ProvidesTemplat
         }
 
         return $worst;
+    }
+
+    /**
+     * Aggiorna la pratica già consegnata (`PATCH …/richieste/{codice}`): i consensi sempre, cliente e pratica solo finché in
+     * unicofinance è da perfezionare (altrimenti 409, che non va ritentato).
+     */
+    public function updateRequest(LoanRequest $loan, array $changes): int
+    {
+        if ($loan->crm_lead_id === null) {
+            return 0;
+        }
+
+        if (! $this->client->isConfigured()) {
+            // Configurazione mancante: non è un errore di rete, ritentare non serve.
+            Log::warning('unicofinance: indirizzo, token o segreto mancanti', ['loan' => $loan->code]);
+
+            return 422;
+        }
+
+        $response = $this->call('PATCH', $this->base($loan), $loan, $changes);
+
+        return $response === null ? 0 : ($response->successful() ? 200 : $response->status());
+    }
+
+    /** Nota per l'istruttore (`POST …/richieste/{codice}/note`), idempotente per `$originId`. */
+    public function sendNote(LoanRequest $loan, string $text, string $author, ?string $originId = null): int
+    {
+        if ($loan->crm_lead_id === null) {
+            return 0;
+        }
+
+        if (! $this->client->isConfigured()) {
+            // Configurazione mancante: non è un errore di rete, ritentare non serve.
+            Log::warning('unicofinance: indirizzo, token o segreto mancanti', ['loan' => $loan->code]);
+
+            return 422;
+        }
+
+        $response = $this->call('POST', $this->base($loan).'/note', $loan, array_filter([
+            'testo' => $text,
+            'autore' => $author,
+            'inviata_il' => now()->toIso8601String(),
+            'id_origine' => $originId,
+        ], fn ($value): bool => $value !== null));
+
+        return $response === null ? 0 : ($response->successful() ? 200 : $response->status());
     }
 
     /**
@@ -171,7 +220,7 @@ class UnicofinanceGateway implements CrmGateway, SendsDocuments, ProvidesTemplat
     }
 
     /** Chiamata firmata; null se il servizio non è configurato o non risponde. Nei log solo codici. */
-    private function call(string $method, string $path, LoanRequest $loan, ?array $body = null): ?\Illuminate\Http\Client\Response
+    private function call(string $method, string $path, LoanRequest $loan, ?array $body = null): ?Response
     {
         if (! $this->client->isConfigured()) {
             return null;

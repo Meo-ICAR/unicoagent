@@ -21,8 +21,6 @@ class CompanyForm
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-             
-          
 
             Section::make('Azienda e privacy')->columns(2)
                 ->columnSpanFull()
@@ -102,9 +100,9 @@ class CompanyForm
                     ])->columns(2)->columnSpanFull()
                         ->visible(fn (Get $get) => $get('crm_driver') === 'generic'),
                 ]),
-                  Section::make('Contratto')
-           ->columnSpanFull()
-            ->columns(4)
+            Section::make('Contratto')
+                ->columnSpanFull()
+                ->columns(4)
                 ->schema([
                     Select::make('type')->label('Settore')->options(Company::TYPES)->required()->default('FINANCE'),
                     Select::make('products')->label('Prodotti attivi')->relationship('products', 'name')->multiple()->preload(),

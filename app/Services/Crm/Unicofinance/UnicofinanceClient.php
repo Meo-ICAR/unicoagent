@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Http;
 
 /**
  * Client dell'API in ingresso di unicofinance (/api/agente/v1): token Bearer e firma HMAC-SHA256 di
- * «timestamp.METODO.percorso.sha256-del-contenuto» (il corpo JSON, o il file nei caricamenti). Vedi unicofinance docs/agent-api.md.
+ * «timestamp.METODO.percorso.sha256-del-contenuto» (il corpo JSON, o il file nei caricamenti). Vedi il README di unicofinance
+ * («API per le altre app della suite») e il suo config/agent_api.php.
  */
 class UnicofinanceClient
 {

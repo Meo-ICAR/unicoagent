@@ -43,7 +43,7 @@ Una classe che implementa `CrmGateway` (costruttore con `Company $company` se se
 ## Funzioni oltre l'invio (capacità opzionali)
 
 Un driver dichiara cosa sa fare implementando le interfacce di `App\Services\Crm\Capabilities`; `CrmRegistry::supports()` risponde.
-Il driver `unicofinance` le implementa tutte e quattro.
+Il driver `unicofinance` le implementa tutte.
 
 | Interfaccia | Funzione |
 |---|---|
@@ -51,18 +51,23 @@ Il driver `unicofinance` le implementa tutte e quattro.
 | `ProvidesTemplates` | elenco e scarico dei template dei moduli |
 | `FillsForms` | modulo PDF compilato con i dati della pratica, da stampare |
 | `RequestsSignature` | firma elettronica con OTP e stato della firma |
+| `UpdatesRequest` | aggiornamento della pratica già consegnata (consensi, dati corretti) |
+| `SendsNotes` | note per l'istruttore sulla pratica già consegnata |
 
 Sono tutte funzioni che unico-core e unicofinance hanno già (`ModulePrinter`, `SignatureRequestService`, tipi documento): la stampa passa da `Unico\Core\Pdf\ModulePrinter`; template e firma OTP dall'API di unicofinance.
 
 ## Driver `unicofinance`
 
 Chiavi di `crm_config`: `url` (https; http solo in sviluppo), `token`, `secret` (da `php artisan agent-api:client unicoagent` in unicofinance),
-`analysis` (vuoto = solo esito dell'analisi; `full` = anche i campi letti). Contratto: `docs/agent-api.md` di unicofinance.
+`analysis` (vuoto = solo esito dell'analisi; `full` = anche i campi letti). Contratto: README di unicofinance («API per le altre app della suite»). Le aziende che usavano il driver `unicoloan`, dismesso, sono passate a `unicofinance`: vanno aggiornati indirizzo, token e segreto.
 
 - `submit()` crea cliente e pratica (`POST /api/agente/v1/richieste`, idempotente per `riferimento`); `crm_lead_id` = codice pratica.
 - `sendDocuments()` carica gli allegati non ancora inviati (`attachments.crm_sent_at`), uno per volta, con firma HMAC; rifiutati e senza file si saltano.
 - Il job `SendDocumentsToCrm` parte a fine perfezionamento (5 tentativi, attesa crescente); `php artisan crm:send-documents [--loan=ID]`
   riprova quelli rimasti indietro e gira ogni ora.
+
+- Dopo la consegna il job `SyncCrmRequest` porta a unicofinance i consensi quando l'informativa viene verificata o rifiutata (`PATCH …/richieste/{codice}`, `privacy_verificata_il` nullo = revoca) e una nota quando l'istruttore chiede un documento integrativo (`POST …/richieste/{codice}/note`, idempotente per `id_origine`). Ritenta su errori di rete, 5xx, 408/425/429; un 4xx (es. 409 `pratica_in_lavorazione`) è definitivo. In unicofinance richiesta, aggiornamenti e note si vedono nella scheda «Da unicoagent» della pratica.
+- In senso inverso unicofinance avvisa su `POST /api/unicofinance/eventi` quando l'istruttoria respinge un documento (`documento.da_rifare`, con il motivo) o ne chiede uno nuovo (`documento.richiesto`). La firma è la stessa delle richieste verso unicofinance (HMAC di `timestamp.POST.percorso.sha256-del-corpo` con `crm_config.secret`, scarto massimo 5 minuti); la pratica si trova per `riferimento` = codice della richiesta e deve essere di un'azienda con quel segreto. Il documento (per `alias`, poi `tipo`; se manca si crea come integrativo) passa a «Rifiutato» o «Integrazione richiesta» e l'agente riceve il messaggio su WhatsApp, come quando decide l'operatore qui; nessuna nota torna a unicofinance. Ogni `event_id` vale una volta. In unicofinance si attiva con `php artisan agent-api:client unicoagent --rotate --webhook=https://<unicoagent>/api/unicofinance/eventi`.
 
 Funzioni documentali (template, firma e file passano da unicofinance, che resta l'unico a conoscere i provider di firma):
 `templates()` elenca i moduli della pratica (codice = id del modulo in unicofinance); `downloadTemplate()` scarica il PDF vuoto;

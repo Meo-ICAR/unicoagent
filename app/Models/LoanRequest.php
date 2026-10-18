@@ -3,13 +3,16 @@
 namespace App\Models;
 
 use App\Jobs\AnalyzeAttachment;
+use App\Jobs\SyncCrmRequest;
 use App\Models\Concerns\BelongsToCompany;
 use App\Services\Flows\FlowRepository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Unico\Core\Models\Document;
 
 class LoanRequest extends Model
 {
@@ -43,9 +46,9 @@ class LoanRequest extends Model
 
     /** Le relazioni morph dei Document del core non devono caricare la pratica sulla connessione del core (lì non c'è la tabella). */
     /** Documenti prodotti con unico-core (Document del core agganciati con l'alias `loan_request`). */
-    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    public function documents(): MorphMany
     {
-        return $this->morphMany(\Unico\Core\Models\Document::class, 'documentable');
+        return $this->morphMany(Document::class, 'documentable');
     }
 
     public function getConnectionName(): ?string
@@ -143,6 +146,7 @@ class LoanRequest extends Model
     {
         if (! $this->privacy_verified_at) {
             $this->update(['privacy_verified_at' => now()]);
+            SyncCrmRequest::consent($this);
         }
 
         $this->attachments()->where('status', 'in_attesa_informativa')->get()
@@ -152,7 +156,10 @@ class LoanRequest extends Model
     /** L'informativa è stata rifiutata: i documenti già letti restano, quelli nuovi aspetteranno un'informativa valida. */
     public function revokePrivacy(): void
     {
-        $this->update(['privacy_verified_at' => null]);
+        if ($this->privacy_verified_at) {
+            $this->update(['privacy_verified_at' => null]);
+            SyncCrmRequest::consent($this);
+        }
     }
 
     /**
@@ -161,11 +168,20 @@ class LoanRequest extends Model
      */
     public function requestIntegrativeDocument(?string $catalogCode, string $name, string $note, int $userId): PraticaDocument
     {
+        $slot = $this->integrativeSlot($catalogCode, $name);
+        $slot->requestIntegration($note, $userId);
+
+        return $slot->fresh();
+    }
+
+    /** Il documento integrativo con questo codice del catalogo (o con questo nome), creato se manca. */
+    public function integrativeSlot(?string $catalogCode, string $name): PraticaDocument
+    {
         $template = $catalogCode
             ? FinanziamentoDocument::where('product', $this->product)->where('code', $catalogCode)->first()
             : null;
 
-        $slot = $this->praticaDocuments()->firstOrCreate(
+        return $this->praticaDocuments()->firstOrCreate(
             ['code' => $template?->code ?? Str::slug($name)],
             [
                 'name' => $template?->name ?? $name,
@@ -174,9 +190,6 @@ class LoanRequest extends Model
                 'sort_order' => 900,
             ],
         );
-        $slot->requestIntegration($note, $userId);
-
-        return $slot->fresh();
     }
 
     /** Tutti i documenti obbligatori sono OK e non c'è nessuna integrazione richiesta e non ancora ricevuta. */
