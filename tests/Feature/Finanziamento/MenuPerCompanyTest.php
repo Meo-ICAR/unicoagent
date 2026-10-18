@@ -4,6 +4,8 @@ namespace Tests\Feature\Finanziamento;
 
 use App\Models\Company;
 use App\Models\Conversation;
+use App\Models\Flow;
+use App\Models\FlowNode;
 use App\Models\Fornitore;
 
 class MenuPerCompanyTest extends ConversationTestCase
@@ -38,5 +40,30 @@ class MenuPerCompanyTest extends ConversationTestCase
         $this->say('ciao', 'Nuova offerta');
 
         $this->assertSame('richiesta', Conversation::latest('id')->first()?->flow);
+    }
+
+    public function test_mediatore_demo_avvia_anche_il_percorso_della_fornitura(): void
+    {
+        $demo = Company::create([
+            'name' => 'Mediatore DEMO',
+            'type' => 'FINANCE',
+            'menu' => ['options' => [
+                'menu_richiedi' => 'Richiedi Finanziamento',
+                'fornitura' => 'Nuova offerta',
+            ]],
+        ]);
+        $flow = Flow::create([
+            'company_id' => $demo->id, 'code' => 'fornitura', 'name' => 'Nuova offerta',
+            'start' => 'profilo', 'restart' => 'profilo', 'is_active' => true, 'is_test' => false,
+        ]);
+        FlowNode::create([
+            'flow_id' => $flow->id, 'company_id' => $demo->id, 'code' => 'profilo',
+            'type' => 'choice', 'prompt' => 'Che tipo di utenza è?',
+        ]);
+
+        $this->say('ciao', 'Nuova offerta');
+
+        $this->assertSame('fornitura', Conversation::latest('id')->first()?->flow);
+        $this->assertSame($demo->id, Conversation::latest('id')->first()?->company_id);
     }
 }
