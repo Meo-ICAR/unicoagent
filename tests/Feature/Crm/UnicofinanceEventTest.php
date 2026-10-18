@@ -104,4 +104,29 @@ class UnicofinanceEventTest extends TestCase
 
         $this->assertSame('ok', $this->identity->refresh()->status);
     }
+
+    public function test_a_practice_of_another_company_is_not_touched(): void
+    {
+        $other = Company::create(['name' => 'Altra', 'crm_driver' => 'unicofinance', 'crm_config' => ['url' => 'https://altra.example.com', 'token' => 'T2', 'secret' => 'ALTRO']]);
+        $this->loan->update(['company_id' => Company::query()->where('name', 'H')->value('id')]);
+
+        $this->send($this->event(), 'ALTRO')->assertNotFound();
+        $this->assertSame('ok', $this->identity->refresh()->status);
+        $this->assertNotNull($other->id);
+    }
+
+    public function test_an_unknown_event_is_ignored_even_without_document(): void
+    {
+        $this->send(['event_id' => 'x:3', 'evento' => 'pratica.chiusa'])->assertOk()->assertJsonPath('esito', 'ignorato');
+    }
+
+    public function test_the_alias_comes_before_the_type_and_a_new_document_keeps_the_alias(): void
+    {
+        $this->loan->praticaDocuments()->create(['code' => 'carta-identita', 'name' => 'Altro', 'requirement' => 'facoltativo', 'status' => 'ok']);
+
+        $this->send($this->event())->assertOk()->assertJsonPath('documento', 'documento_identita');
+
+        $this->send($this->event(['event_id' => 'r:9', 'evento' => 'documento.richiesto', 'documento' => ['tipo' => 'cud-zz', 'alias' => ['cud'], 'nome' => 'CUD']]))
+            ->assertOk()->assertJsonPath('documento', 'cud');
+    }
 }

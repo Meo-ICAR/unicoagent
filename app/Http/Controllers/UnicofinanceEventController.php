@@ -34,9 +34,16 @@ class UnicofinanceEventController extends Controller
             return response()->json(['codice' => 'firma_non_valida'], 401);
         }
 
+        $request->validate(['event_id' => ['required', 'string', 'max:191'], 'evento' => ['required', 'string']]);
+        $status = self::EVENTS[$request->input('evento')] ?? null;
+
+        // Un evento che qui non serve si conferma senza chiedere i dati dei documenti: unicofinance non deve ritentarlo.
+        if ($status === null) {
+            return response()->json(['esito' => 'ignorato']);
+        }
+
         $data = $request->validate([
             'event_id' => ['required', 'string', 'max:191'],
-            'evento' => ['required', 'string'],
             'riferimento' => ['required', 'string'],
             'documento' => ['required', 'array'],
             'documento.tipo' => ['nullable', 'string'],
@@ -46,15 +53,9 @@ class UnicofinanceEventController extends Controller
             'documento.motivo' => ['nullable', 'string'],
         ]);
 
-        $status = self::EVENTS[$data['evento']] ?? null;
-
-        if ($status === null) {
-            return response()->json(['esito' => 'ignorato']);
-        }
-
         $loan = LoanRequest::where('code', $data['riferimento'])->first();
 
-        if ($loan === null || $loan->is_test || Company::forWhatsApp($loan->agent_wa_number)?->id !== $company->id) {
+        if ($loan === null || $loan->is_test || $this->companyOf($loan) !== $company->id) {
             return response()->json(['codice' => 'pratica_sconosciuta'], 404);
         }
 
@@ -84,7 +85,11 @@ class UnicofinanceEventController extends Controller
         $codes = array_values(array_filter([...Arr::wrap($document['alias'] ?? []), $document['tipo'] ?? null]));
         $name = $document['nome'] ?? $codes[0] ?? 'Documento';
 
-        $slot = $codes === [] ? null : $loan->praticaDocuments()->whereIn('code', $codes)->first();
+        // Prima gli alias (i codici di qui), poi il tipo di unicofinance.
+        $slot = null;
+        foreach ($codes as $code) {
+            $slot ??= $loan->praticaDocuments()->where('code', $code)->first();
+        }
         $slot ??= $loan->integrativeSlot($codes[0] ?? null, $name);
 
         $note = $status === 'rejected'
@@ -95,6 +100,12 @@ class UnicofinanceEventController extends Controller
         $status === 'rejected' ? $slot->reject($note, null) : $slot->requestIntegration($note, null, tellCrm: false);
 
         return $slot->fresh();
+    }
+
+    /** L'azienda della pratica: quella salvata sulla pratica, altrimenti quella dell'agente. */
+    private function companyOf(LoanRequest $loan): ?int
+    {
+        return $loan->company_id !== null ? (int) $loan->company_id : Company::forWhatsApp($loan->agent_wa_number)?->id;
     }
 
     /** L'azienda il cui segreto firma la richiesta, se il timestamp è recente. */

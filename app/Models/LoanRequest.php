@@ -174,7 +174,7 @@ class LoanRequest extends Model
         return $slot->fresh();
     }
 
-    /** Il documento integrativo con questo codice del catalogo (o con questo nome), creato se manca. */
+    /** Il documento integrativo con questo codice (del catalogo o, se non c'è, il codice stesso; senza codice il nome), creato se manca. */
     public function integrativeSlot(?string $catalogCode, string $name): PraticaDocument
     {
         $template = $catalogCode
@@ -182,7 +182,7 @@ class LoanRequest extends Model
             : null;
 
         return $this->praticaDocuments()->firstOrCreate(
-            ['code' => $template?->code ?? Str::slug($name)],
+            ['code' => $template?->code ?? (filled($catalogCode) ? $catalogCode : Str::slug($name))],
             [
                 'name' => $template?->name ?? $name,
                 'requirement' => 'integrativo',
