@@ -271,6 +271,11 @@ class ConversationEngine
             }
         }
 
+        // Una voce del menu può essere il codice di un percorso della company (finanziamento e fornitura insieme).
+        if (is_string($choice) && $this->flows->flow($choice) !== null) {
+            return $this->start($m->from, $choice);
+        }
+
         return match ($choice) {
             'menu_richiedi' => $this->start($m->from, 'richiesta'),
             'menu_modifica' => $this->quoteList($m->from),

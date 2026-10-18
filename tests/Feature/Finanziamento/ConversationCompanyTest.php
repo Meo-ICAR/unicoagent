@@ -30,6 +30,16 @@ class ConversationCompanyTest extends ConversationTestCase
         $this->assertStringContainsString('non è ancora attivo', $this->bodies($replies));
     }
 
+    public function test_un_numero_dei_fornitori_races_usa_races_e_un_numero_sconosciuto_mediatore_demo(): void
+    {
+        $races = Company::create(['name' => 'Races Finance S.r.l.', 'type' => 'FINANCE', 'core_company_id' => 9]);
+        $demo = Company::create(['name' => 'Mediatore DEMO', 'type' => 'FINANCE']);
+        Fornitore::create(['name' => 'Agente Races', 'tel' => '3331112222', 'is_active' => true, 'company_id' => 9]);
+
+        $this->assertSame($races->id, Company::forWhatsApp('393331112222')->id);
+        $this->assertSame($demo->id, Company::forWhatsApp('393330000000')->id);
+    }
+
     public function test_la_conversazione_porta_la_company_dell_agente(): void
     {
         $company = Company::create(['name' => 'Titolare']);

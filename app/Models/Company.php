@@ -83,13 +83,24 @@ class Company extends Model
         return $this->crmDriver() !== null;
     }
 
+    /**
+     * L'azienda di chi scrive su WhatsApp. Il telefono si cerca tra i fornitori: se è di Races
+     * (o di un'altra società del core collegata qui) vale quell'azienda. Se il numero non c'è, è un agente di Mediatore DEMO.
+     */
     public static function forWhatsApp(?string $waNumber): ?self
     {
-        $id = filled($waNumber) ? Fornitore::findByWhatsApp($waNumber)?->company_id : null;
-        // Il company_id dell'agente è un id locale: la relazione `company()` leggerebbe `companies` dalla connessione core.
-        $company = $id ? static::find($id) : null;
+        $agent = filled($waNumber) ? Fornitore::findByWhatsApp($waNumber) : null;
 
-        return $company ?? static::current();
+        if ($agent !== null && filled($agent->company_id)) {
+            $company = static::query()->where('core_company_id', $agent->company_id)->first()
+                ?? static::query()->find($agent->company_id);
+
+            if ($company !== null) {
+                return $company;
+            }
+        }
+
+        return static::query()->where('name', 'Mediatore DEMO')->first() ?? static::current();
     }
 
     /** L'installazione serve una sola azienda: vale la prima. */

@@ -9,7 +9,7 @@ La pratica perfezionata arriva al CRM dell'azienda. Ogni azienda usa **un solo**
 | `email` | nessun CRM: dati e allegati vanno per email all'istruttoria |
 | `mediafacile` | servizio di caricamento lead Mediafacile (GET, risposta XML) |
 | `generic` | qualsiasi CRM con API REST, configurato da pannello (sotto) |
-| `unicoloan` | unicoloan tramite la sua API per agenti (sotto) |
+| `unicofinance` | unicofinance tramite la sua API per agenti (sotto) |
 
 `CRM_DRIVER=simulated` (sviluppo, test) fa rispondere la simulazione per tutte le aziende.
 
@@ -43,7 +43,7 @@ Una classe che implementa `CrmGateway` (costruttore con `Company $company` se se
 ## Funzioni oltre l'invio (capacità opzionali)
 
 Un driver dichiara cosa sa fare implementando le interfacce di `App\Services\Crm\Capabilities`; `CrmRegistry::supports()` risponde.
-Il driver `unicoloan` le implementa tutte e quattro.
+Il driver `unicofinance` le implementa tutte e quattro.
 
 | Interfaccia | Funzione |
 |---|---|
@@ -52,23 +52,23 @@ Il driver `unicoloan` le implementa tutte e quattro.
 | `FillsForms` | modulo PDF compilato con i dati della pratica, da stampare |
 | `RequestsSignature` | firma elettronica con OTP e stato della firma |
 
-Sono tutte funzioni che unico-core e unicoloan hanno già (`ModulePrinter`, `SignatureRequestService`, tipi documento): la stampa passa da `Unico\Core\Pdf\ModulePrinter`; template e firma OTP dall'API di unicoloan.
+Sono tutte funzioni che unico-core e unicofinance hanno già (`ModulePrinter`, `SignatureRequestService`, tipi documento): la stampa passa da `Unico\Core\Pdf\ModulePrinter`; template e firma OTP dall'API di unicofinance.
 
-## Driver `unicoloan`
+## Driver `unicofinance`
 
-Chiavi di `crm_config`: `url` (https; http solo in sviluppo), `token`, `secret` (da `php artisan agent-api:client unicoagent` in unicoloan),
-`analysis` (vuoto = solo esito dell'analisi; `full` = anche i campi letti). Contratto: `docs/agent-api.md` di unicoloan.
+Chiavi di `crm_config`: `url` (https; http solo in sviluppo), `token`, `secret` (da `php artisan agent-api:client unicoagent` in unicofinance),
+`analysis` (vuoto = solo esito dell'analisi; `full` = anche i campi letti). Contratto: `docs/agent-api.md` di unicofinance.
 
 - `submit()` crea cliente e pratica (`POST /api/agente/v1/richieste`, idempotente per `riferimento`); `crm_lead_id` = codice pratica.
 - `sendDocuments()` carica gli allegati non ancora inviati (`attachments.crm_sent_at`), uno per volta, con firma HMAC; rifiutati e senza file si saltano.
 - Il job `SendDocumentsToCrm` parte a fine perfezionamento (5 tentativi, attesa crescente); `php artisan crm:send-documents [--loan=ID]`
   riprova quelli rimasti indietro e gira ogni ora.
 
-Funzioni documentali (template, firma e file passano da unicoloan, che resta l'unico a conoscere i provider di firma):
-`templates()` elenca i moduli della pratica (codice = id del modulo in unicoloan); `downloadTemplate()` scarica il PDF vuoto;
+Funzioni documentali (template, firma e file passano da unicofinance, che resta l'unico a conoscere i provider di firma):
+`templates()` elenca i moduli della pratica (codice = id del modulo in unicofinance); `downloadTemplate()` scarica il PDF vuoto;
 `fillForm()` stampa il modulo con `Unico\Core\Pdf\ModulePrinter` (dati della pratica sul database core) e restituisce il PDF;
-`requestSignature($loan, $codiceModulo)` compila il modulo in unicoloan e chiede la firma OTP, `reference` = id del documento in unicoloan; `signatureStatus()` risponde `inviata | firmata | rifiutata | scaduta | errore`.
-Una volta firmato, `GET …/documenti/{id}/file` di unicoloan restituisce il PDF firmato.
+`requestSignature($loan, $codiceModulo)` compila il modulo in unicofinance e chiede la firma OTP, `reference` = id del documento in unicofinance; `signatureStatus()` risponde `inviata | firmata | rifiutata | scaduta | errore`.
+Una volta firmato, `GET …/documenti/{id}/file` di unicofinance restituisce il PDF firmato.
 Nessuna di queste è ancora richiamata da una conversazione: sono a disposizione per le prossime funzioni dell'agente.
 
 ## Eventi verso UnicoBPM
