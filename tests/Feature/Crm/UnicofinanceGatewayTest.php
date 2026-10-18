@@ -3,11 +3,18 @@
 namespace Tests\Feature\Crm;
 
 use App\Jobs\SendDocumentsToCrm;
+use App\Jobs\SyncCrmRequest;
 use App\Models\Attachment;
 use App\Models\Company;
+use App\Models\Fornitore;
 use App\Models\LoanRequest;
 use App\Models\PraticaDocument;
+use App\Services\Crm\Capabilities\FillsForms;
+use App\Services\Crm\Capabilities\ProvidesTemplates;
+use App\Services\Crm\Capabilities\RequestsSignature;
 use App\Services\Crm\Capabilities\SendsDocuments;
+use App\Services\Crm\Capabilities\SendsNotes;
+use App\Services\Crm\Capabilities\UpdatesRequest;
 use App\Services\Crm\CrmGateway;
 use App\Services\Crm\CrmRegistry;
 use App\Services\Crm\UnicofinanceGateway;
@@ -19,6 +26,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
+use Unico\Core\Pdf\ModulePrinter;
 
 class UnicofinanceGatewayTest extends TestCase
 {
@@ -51,7 +59,7 @@ class UnicofinanceGatewayTest extends TestCase
 
     private function agent(): void
     {
-        \App\Models\Fornitore::create(['name' => 'Agente', 'piva' => '12345678901', 'tel' => '+39 333 111 2222', 'is_active' => true, 'company_id' => (Company::first() ?? $this->company())->id]);
+        Fornitore::create(['name' => 'Agente', 'piva' => '12345678901', 'tel' => '+39 333 111 2222', 'is_active' => true, 'company_id' => (Company::first() ?? $this->company())->id]);
     }
 
     private function attach(LoanRequest $loan, string $kind, string $body = '%PDF-1.4 contenuto', ?string $slotStatus = null): Attachment
@@ -271,9 +279,108 @@ class UnicofinanceGatewayTest extends TestCase
     {
         $registry = app(CrmRegistry::class);
 
-        foreach ([\App\Services\Crm\Capabilities\ProvidesTemplates::class, \App\Services\Crm\Capabilities\FillsForms::class, \App\Services\Crm\Capabilities\RequestsSignature::class] as $capability) {
+        foreach ([ProvidesTemplates::class, FillsForms::class, RequestsSignature::class, UpdatesRequest::class, SendsNotes::class] as $capability) {
             $this->assertTrue($registry->supports('unicofinance', $capability));
         }
+    }
+
+    public function test_aggiornamento_e_nota_vanno_firmati_sulla_pratica_consegnata(): void
+    {
+        Http::fake(['unicofinance.example.com/*' => Http::response(['campi_aggiornati' => ['general_consent_at']], 200)]);
+        $gateway = $this->gateway();
+
+        $this->assertSame(0, $gateway->updateRequest($this->loan(['code' => 'FIN-NON-CONSEGNATA']), ['consenso' => []]));
+        Http::assertNothingSent();
+
+        $loan = $this->loan(['crm_lead_id' => 'WA-FIN-2026-0300']);
+        $this->assertSame(200, $gateway->updateRequest($loan, ['consenso' => ['privacy_verificata_il' => null]]));
+        $this->assertSame(200, $gateway->sendNote($loan, 'Chiamare dopo le 18', 'agente', 'nota-1'));
+
+        Http::assertSent(function (Request $request) {
+            $expected = hash_hmac('sha256', implode('.', [$request->header('X-Timestamp')[0], 'PATCH', '/api/agente/v1/richieste/FIN-2026-0300', hash('sha256', $request->body())]), 'SEG');
+
+            return $request->method() === 'PATCH' && $request->url() === self::BASE.'/api/agente/v1/richieste/FIN-2026-0300'
+                && hash_equals($expected, $request->header('X-Signature')[0])
+                && array_key_exists('privacy_verificata_il', $request['consenso']) && $request['consenso']['privacy_verificata_il'] === null;
+        });
+        Http::assertSent(function (Request $request) {
+            $expected = hash_hmac('sha256', implode('.', [$request->header('X-Timestamp')[0], 'POST', '/api/agente/v1/richieste/FIN-2026-0300/note', hash('sha256', $request->body())]), 'SEG');
+
+            return $request->method() === 'POST' && $request->url() === self::BASE.'/api/agente/v1/richieste/FIN-2026-0300/note'
+                && hash_equals($expected, $request->header('X-Signature')[0])
+                && $request['testo'] === 'Chiamare dopo le 18' && $request['autore'] === 'agente' && $request['id_origine'] === 'nota-1';
+        });
+    }
+
+    public function test_senza_configurazione_aggiornamenti_e_note_non_si_ritentano(): void
+    {
+        Http::fake();
+        $company = $this->company(['url' => '', 'token' => '', 'secret' => '']);
+        $loan = $this->loan(['crm_lead_id' => 'WA-FIN-2026-0300']);
+
+        $this->assertSame(422, $this->gateway($company)->sendNote($loan, 'x', 'agente'));
+        (new SyncCrmRequest($loan->id, 'nota', ['testo' => 'x', 'autore' => 'agente']))->handle(app(CrmRegistry::class));
+        Http::assertNothingSent();
+    }
+
+    public function test_anche_la_richiesta_di_integrazione_su_un_documento_arriva_come_nota(): void
+    {
+        Bus::fake([SyncCrmRequest::class]);
+        $loan = $this->loan(['crm_lead_id' => 'WA-FIN-2026-0300']);
+        $slot = $loan->praticaDocuments()->create(['code' => 'busta_paga', 'name' => 'Busta paga', 'requirement' => 'obbligatorio', 'status' => 'ricevuto']);
+
+        $slot->requestIntegration('Manca la seconda pagina', 1);
+        $slot->requestIntegration('Ancora illeggibile', 1);
+
+        Bus::assertDispatchedTimes(SyncCrmRequest::class, 2);
+        $ids = [];
+        Bus::assertDispatched(SyncCrmRequest::class, function (SyncCrmRequest $job) use (&$ids): bool {
+            $ids[] = $job->note['id_origine'];
+
+            return str_contains($job->note['testo'], 'Busta paga');
+        });
+        $this->assertCount(2, array_unique($ids));
+    }
+
+    public function test_informativa_verificata_o_rifiutata_dopo_la_consegna_aggiorna_i_consensi(): void
+    {
+        Bus::fake([SyncCrmRequest::class]);
+        $this->company();
+        $nonConsegnata = $this->loan(['code' => 'FIN-0301']);
+        $consegnata = $this->loan(['crm_lead_id' => 'WA-FIN-2026-0300']);
+
+        $nonConsegnata->verifyPrivacy();
+        $consegnata->verifyPrivacy();
+        $consegnata->revokePrivacy();
+
+        Bus::assertDispatchedTimes(SyncCrmRequest::class, 2);
+        Bus::assertDispatched(SyncCrmRequest::class, fn (SyncCrmRequest $job) => $job->loanId === $consegnata->id && $job->kind === 'consenso');
+    }
+
+    public function test_il_job_manda_i_consensi_ritenta_sui_5xx_e_si_ferma_sui_rifiuti(): void
+    {
+        $this->company();
+        $loan = $this->loan(['crm_lead_id' => 'WA-FIN-2026-0300', 'privacy_received_at' => now(), 'privacy_verified_at' => null]);
+        Http::fake(['unicofinance.example.com/*' => Http::sequence()->push(['codice' => 'pratica_in_lavorazione'], 409)->push([], 503)]);
+
+        (new SyncCrmRequest($loan->id, 'consenso'))->handle(app(CrmRegistry::class));
+        Http::assertSent(fn (Request $request) => $request->method() === 'PATCH' && $request['consenso']['privacy_verificata_il'] === null && $request['consenso']['privacy_ricevuta_il'] !== null);
+
+        $this->expectException(\RuntimeException::class);
+        (new SyncCrmRequest($loan->id, 'consenso'))->handle(app(CrmRegistry::class));
+    }
+
+    public function test_la_richiesta_di_un_documento_integrativo_arriva_come_nota(): void
+    {
+        Bus::fake([SyncCrmRequest::class]);
+        $loan = $this->loan(['crm_lead_id' => 'WA-FIN-2026-0300']);
+
+        $loan->requestIntegrativeDocument(null, 'Estratto conto', 'Ultimi tre mesi', 1);
+
+        Bus::assertDispatched(SyncCrmRequest::class, fn (SyncCrmRequest $job) => $job->kind === 'nota'
+            && $job->note['autore'] === 'istruttore'
+            && str_contains($job->note['testo'], 'Estratto conto') && str_contains($job->note['testo'], 'Ultimi tre mesi')
+            && str_starts_with((string) $job->note['id_origine'], 'integrazione:'));
     }
 
     public function test_elenca_e_scarica_i_template(): void
@@ -293,7 +400,7 @@ class UnicofinanceGatewayTest extends TestCase
 
     public function test_il_modulo_compilato_si_stampa_con_unico_core(): void
     {
-        $this->mock(\Unico\Core\Pdf\ModulePrinter::class)
+        $this->mock(ModulePrinter::class)
             ->shouldReceive('printByReference')
             ->once()
             ->with('FIN-2026-0300', '7')
