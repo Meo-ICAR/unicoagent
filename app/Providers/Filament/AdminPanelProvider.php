@@ -37,9 +37,9 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->renderHook(PanelsRenderHook::USER_MENU_BEFORE, fn () => view('filament.company-switcher'))
-            ->brandLogo(asset('unicoagent_banner.png'))
+            ->brandLogo(asset('brand/logos/unico-agent.jpg'))
             ->brandLogoHeight('2.5rem')
-            ->favicon(asset('unicoagent_logo.png'))
+            ->favicon(asset('brand/icons/unico-agent-64.png'))
             ->navigationGroups([
                 NavigationGroup::make('Anagrafiche'),
                 NavigationGroup::make('Settings')->collapsed(),
