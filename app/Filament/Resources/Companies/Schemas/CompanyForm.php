@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Companies\Schemas;
 
 use App\Models\Company;
 use App\Services\Crm\CrmRegistry;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\KeyValue;
@@ -15,19 +16,35 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 
 class CompanyForm
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
+            TextInput::make('name')->label('Ragione sociale')->required()->maxLength(255),
+            TextInput::make('whatsapp_number')->label('Cellulare WhatsApp')->tel()->maxLength(30)
+                ->helperText('Il numero WhatsApp Business dell\'azienda.')
+                ->suffixAction(
+                    Action::make('conversazioni')
+                        ->icon(Heroicon::OutlinedChatBubbleLeftRight)
+                        ->tooltip('Conversazioni di questo numero')
+                        ->url(fn (?Company $record) => route('filament.admin.resources.conversations.index', [
+                            'filters' => [
+                                'company_id' => ['value' => $record->id],
+                                'wa_number' => ['wa_number' => $record->whatsapp_number],
+                            ],
+                        ]))
+                        ->openUrlInNewTab()
+                        ->visible(fn (?Company $record) => filled($record?->whatsapp_number))
+                ),
 
-            Section::make('Azienda e privacy')->columns(2)
+            Section::make('Azienda e privacy')->collapsed()->columns(2)
                 ->columnSpanFull()
                 ->description('Questi dati compaiono nell\'informativa privacy pubblica (/privacy).')
                 ->columns(2)
                 ->schema([
-                    TextInput::make('name')->label('Ragione sociale')->required()->maxLength(255)->columnSpanFull(),
                     TextInput::make('address')->label('Sede')->maxLength(255)->columnSpanFull(),
                     TextInput::make('email')->label('Email per la privacy')->email()->maxLength(255),
                     TextInput::make('dpo_email')->label('Email del DPO (se nominato)')->email()->maxLength(255),
@@ -53,7 +70,7 @@ class CompanyForm
                         ->helperText('Fornita con il servizio di caricamento lead; serve solo se il CRM è quello Mediafacile.'),
 
                 ]),
-            Section::make('CRM dell\'istruttoria')
+            Section::make('CRM dell\'istruttoria')->collapsed()
                 ->columnSpanFull()
                 ->columns(2)
                 ->description('Il CRM a cui arriva la pratica perfezionata. Un\'azienda ne usa uno solo.')
@@ -100,7 +117,7 @@ class CompanyForm
                     ])->columns(2)->columnSpanFull()
                         ->visible(fn (Get $get) => $get('crm_driver') === 'generic'),
                 ]),
-            Section::make('Contratto')
+            Section::make('Contratto')->collapsed()
                 ->columnSpanFull()
                 ->columns(4)
                 ->schema([
@@ -110,8 +127,6 @@ class CompanyForm
                     DatePicker::make('trial_activated_at')->label('Prova attivata il'),
                     DatePicker::make('trialend_at')->label('La prova termina il')->visible(fn ($get) => (bool) $get('is_trial')),
                     DatePicker::make('activated_at')->label('Contratto attivato il'),
-                    TextInput::make('whatsapp_number')->label('Cellulare WhatsApp')->tel()->maxLength(30)
-                        ->helperText('Il numero WhatsApp Business dell\'azienda.'),
                     FileUpload::make('logo')->label('Logo')->image()->disk('public')->directory('company-logos')->visibility('public'),
                     KeyValue::make('menu.options')->label('Voci del menu WhatsApp (id → titolo)')->columnSpanFull()
                         ->keyLabel('Id')->valueLabel('Titolo (max 24 caratteri)')

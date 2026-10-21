@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Conversation extends Model
 {
@@ -41,5 +42,10 @@ class Conversation extends Model
     public function loanRequest(): BelongsTo
     {
         return $this->belongsTo(LoanRequest::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(ConversationMessage::class)->orderBy('id');
     }
 }

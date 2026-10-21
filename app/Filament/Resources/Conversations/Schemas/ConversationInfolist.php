@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Conversations\Schemas;
 
 use App\Filament\Resources\Conversations\Tables\ConversationsTable;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 use Filament\Schemas\Schema;
 
 /** Non mostra mai i dati in corso della conversazione (possono contenere dati personali). */
@@ -20,6 +21,7 @@ class ConversationInfolist
             TextEntry::make('loanRequest.code')->label('Pratica')->placeholder('-'),
             TextEntry::make('created_at')->label('Iniziata il')->dateTime(),
             TextEntry::make('updated_at')->label('Ultimo messaggio')->dateTime(),
+            ViewEntry::make('chat')->label('Chat')->view('filament.conversation-chat')->columnSpanFull(),
         ]);
     }
 }

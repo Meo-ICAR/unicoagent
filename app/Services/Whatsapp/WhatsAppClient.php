@@ -2,6 +2,7 @@
 
 namespace App\Services\Whatsapp;
 
+use App\Models\ConversationMessage;
 use App\Services\Conversation\Reply;
 use App\Services\SystemHealth;
 use Illuminate\Support\Facades\Http;
@@ -23,6 +24,8 @@ class WhatsAppClient
 
             return false;
         }
+
+        ConversationMessage::recordOutgoing($to, $reply);
 
         return true;
     }

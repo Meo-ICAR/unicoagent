@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ConversationMessage;
 use App\Services\Conversation\ConversationEngine;
 use App\Services\Conversation\IncomingMessage;
 use App\Services\Whatsapp\WhatsAppClient;
@@ -50,6 +51,8 @@ class WhatsAppController extends Controller
                 $engine->discardStoredFiles();
                 Log::error('Errore gestione webhook WhatsApp: '.$e->getMessage());
             }
+
+            ConversationMessage::recordIncoming($message);
         }
 
         return response()->json(['status' => 'EVENT_RECEIVED'], 200);

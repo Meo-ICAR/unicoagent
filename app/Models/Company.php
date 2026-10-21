@@ -16,6 +16,7 @@ class Company extends Model
     protected function casts(): array
     {
         return [
+            'is_active' => 'boolean',
             'is_trial' => 'boolean',
             'preventivatore_passkey' => 'encrypted',
             'istruttoria_passkey' => 'encrypted',
