@@ -12,7 +12,7 @@
 
 ## Global Constraints
 - Due repository: `/var/www/html/unico-core` (core) e `/var/www/html/unicoagent`. Si committa in ciascuno; unicoagent legge il core da `../unico-core` (path repository), quindi le modifiche al core sono subito visibili.
-- Il DB condiviso `unico_core_test` è di sviluppo: nessun backup richiesto (decisione dell'utente). I seeder devono essere ripetibili.
+- Il DB condiviso `unicosuite_test` è di sviluppo: nessun backup richiesto (decisione dell'utente). I seeder devono essere ripetibili.
 - Limiti WhatsApp: titolo opzione max 24 caratteri, max 10 opzioni per nodo.
 - Config senza closure nei valori (compatibile con `config:cache`); i `$choice/$text/$file/$summary` sono closure *locali* al file, come già in `config/energy.php`.
 - Nessun dato personale nei log (solo il tipo di errore).

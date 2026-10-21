@@ -11,7 +11,7 @@ Flow `richiesta` sul modello dell'IVR (profilo, fornitura luce/gas/luce_gas, res
 ## Fuori ambito
 Contratto Edison reale (si simula, vedi sotto), valore legale della firma da confermare con GBD, integrazione diretta con Edison, rotte web: tutto resta su WhatsApp.
 
-## Fatti verificati (DB `unico_core_test`, codice di `unico-core`)
+## Fatti verificati (DB `unicosuite_test`, codice di `unico-core`)
 - `document_types` ha già: Visura camerale (34, `is_ai_check`), Estratto conto bancario (42), Carta d'identità (38, `ai_kind=identita`), Contratto utenza (140, senza modulo), Informativa privacy 2025 (111, modulo 4). **Mancano**: contratto di fornitura Edison, modulo SDD, dichiarazione sul titolo di possesso dell'immobile, bolletta.
 - `ai_kind` è valorizzato solo per `identita`, `codice_fiscale`, `informativa`; i `pdf_modules` hanno `signature_slots` (ruolo `client`) e i campi in `pdf_module_fields`.
 - unico-core ha già `OpenApiCompanyService::fetchCompany(P.IVA)` (Openapi.it `IT-advanced`: ragione sociale, PEC, SDI, ATECO, sede, soci). Il credit score è solo simulato (`openapi.creditscore_live`). **Catasto non esiste.**
@@ -20,7 +20,7 @@ Contratto Edison reale (si simula, vedi sotto), valore legale della firma da con
 ## Design
 
 ### 1. Core (repository `unico-core`)
-**Tipi di documento nuovi** (seeder ripetibile `database/seeders/data/document_types.json` + inserimento nel DB condiviso, dopo backup `mysqldump unico_core_test`; l'utente ha autorizzato l'aggiunta):
+**Tipi di documento nuovi** (seeder ripetibile `database/seeders/data/document_types.json` + inserimento nel DB condiviso, dopo backup `mysqldump unicosuite_test`; l'utente ha autorizzato l'aggiunta):
 | Nome | Tipo | Note |
 |---|---|---|
 | Contratto di fornitura Edison | `template_fillable`, `is_signed`, pratica | simulato |
@@ -67,7 +67,7 @@ Alla conferma, `LoanDocumentProducer` compila il plico dai requisiti del task `A
 - unicoagent: per ogni sezione, ramo «carica» (con `DocumentReader` finto) e ramo «Salta» con le domande a mano; ramo azienda con P.IVA; SDD con intestatario diverso; riepilogo 🟢/🟡; plico prodotto e firma `fake`; catasto in background che non blocca; suite esistente verde (i 2 test già rossi prima delle modifiche, `BpmEventsTest` e `ArchiviazioneDopoPerfezionamentoTest`, non sono parte di questo lavoro).
 
 ## Rischi
-- Scrittura sul DB condiviso `unico_core_test`: backup e inserimenti ripetibili; impostare `ai_kind` sui tipi già esistenti tocca anche le altre company del core.
+- Scrittura sul DB condiviso `unicosuite_test`: backup e inserimenti ripetibili; impostare `ai_kind` sui tipi già esistenti tocca anche le altre company del core.
 - Il formato di risposta del Catasto di Openapi.it non è verificato: si scrive dopo aver letto la definizione OpenAPI, e resta simulato finché non c'è il token.
 - I PDF Edison sono fac-simile: nessun valore contrattuale; i campi vanno riallineati ai moduli reali.
 - Costi della lettura AI e delle API esterne a pagamento (Registro Imprese, Catasto): da concordare con GBD.

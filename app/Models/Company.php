@@ -54,6 +54,16 @@ class Company extends Model
     }
 
     /** La prova è ancora in corso (attiva e non scaduta). */
+    /** Il numero WhatsApp dell'azienda; in prova o se manca vale quello del bot configurato in .env. */
+    public function whatsappNumber(): ?string
+    {
+        if ($this->is_trial || blank($this->whatsapp_number)) {
+            return config('services.whatsapp.number');
+        }
+
+        return $this->whatsapp_number;
+    }
+
     public function isTrialActive(): bool
     {
         return $this->is_trial && ($this->trialend_at === null || ! $this->trialend_at->copy()->endOfDay()->isPast());

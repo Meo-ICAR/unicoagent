@@ -20,12 +20,12 @@ use App\Services\Checks\NodeCheck;
 use App\Services\Crm\CrmGateway;
 use App\Services\Crm\LoanEmailSender;
 use App\Services\Crm\QuoteEmailSender;
+use App\Services\Documents\DocumentChecker;
+use App\Services\Documents\DocumentProductionException;
 use App\Services\Documents\DocumentReader;
+use App\Services\Documents\LoanDocumentProducer;
 use App\Services\Flows\FlowRepository;
 use App\Services\Flows\FlowValidator;
-use App\Services\Documents\DocumentProductionException;
-use App\Services\Documents\LoanDocumentProducer;
-use App\Services\Documents\DocumentChecker;
 use App\Services\Loans\EnergyQuoteEstimator;
 use App\Services\Loans\LoanEstimator;
 use App\Services\Loans\QuoteUnavailable;
@@ -1123,6 +1123,10 @@ class ConversationEngine
         }
 
         $loan->update($this->perfectedAttributes($data, $company));
+        if ($viaCrm) {
+            // Dopo il lead la mail all'istruttoria parte comunque; se non parte il lead è già caricato, quindi non si annulla nulla.
+            $this->mailer->send($loan);
+        }
         $this->fetchCadastre($loan, $company);
         $this->mailer->notifyProducer($loan);
         $this->archiveDocuments($loan);

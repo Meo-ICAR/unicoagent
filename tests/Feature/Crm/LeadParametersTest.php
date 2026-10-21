@@ -40,6 +40,7 @@ class LeadParametersTest extends TestCase
             'cognome' => 'Rossi', 'nome' => 'Mario', 'data_nascita' => '01-01-1980', 'tipologia' => 'Pubblico',
             'importo_richiesto' => '10000,00', 'residenza_citta' => 'Milano', 'residenza_provincia' => 'MI',
             'cellulare' => '+393331234567', 'email' => 'mario@example.com', 'fonte' => 'unicoagent',
+            'codice_fiscale' => 'RSSMRA80A01H501U',
         ], Arr::except($p, 'annotazioni'));
         $this->assertArrayNotHasKey('file', $p);
         $this->assertArrayNotHasKey('Passkey', $p);

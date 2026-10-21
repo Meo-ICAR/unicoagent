@@ -10,7 +10,7 @@ Quali moduli produrre lo dicono i `tasks` del core (documenti per fase). Prima c
 ## Fuori ambito (fase 2)
 Migrare catalogo (`FinanziamentoDocument`), slot (`PraticaDocument`), caricamenti (`Attachment`), pipeline di lettura e `SharePointUploader` di unicoagent sul core. Anagrafica clienti nel registro `clients` del core (scelta B: i documenti sono agganciati alla pratica locale e nessun dato del cliente entra nel registro condiviso). Messaggi WhatsApp fuori finestra (servono modelli approvati da Meta). Il PDF del contratto Edison, finché non c'è.
 
-## Fatti verificati (DB `unico_core_test`, connessione `core`)
+## Fatti verificati (DB `unicosuite_test`, connessione `core`)
 - Esistono `document_types` (195), `document_requirements` (430, con `task_id`), `tasks` (123), `pdf_modules` (13, con 851 campi), `pdf_module_fields`, `documents`, `signature_requests`.
 - Un task dice in quale stato di quale tipo di pratica vale: `trigger_field=tipo_prodotto`, `trigger_value=<tipo>`, `trigger_subfield=stato_pratica`, `trigger_subvalue=<stato>`; ne esistono 88 con `stato_pratica`. `tasks` non ha `company_id`.
 - Il tipo «Utenza» c'è già (stati `Inserita`, `ACCETTATO PREVENTIVO`, `PERFEZIONATA`, `SOSPESA`, `RINUNCIA CLIENTE`; task 95 «Utenza · Inserita»). `PERFEZIONARE` esiste solo per il Mutuo. `ALLA FIRMA` non esiste. `pratica_stati_transizioni` è vuota.
@@ -27,7 +27,7 @@ Migrare catalogo (`FinanziamentoDocument`), slot (`PraticaDocument`), caricament
   - stati di `Utenza`: `INVIO IN ISTRUTTORIA`, `ALLA FIRMA`, `PERFEZIONARE`;
   - task 1 «Utenza · Inserita (GBD)» con i documenti da raccogliere;
   - task 2 «Utenza · ALLA FIRMA (GBD)» con informativa 2025 (tipo 111) e il contratto Edison (tipo e modulo nuovi, aggiunti quando c'è il PDF).
-- L'applicazione al DB condiviso `unico_core_test` avviene solo con l'ok esplicito dell'utente, dopo backup.
+- L'applicazione al DB condiviso `unicosuite_test` avviene solo con l'ok esplicito dell'utente, dopo backup.
 
 ### 2. unicoagent
 - **Configurazione:** `config/media-library.php` con il `Media` del core; alias morph `loan_request` → `App\Models\LoanRequest`; `config/energy.php` (o la scheda Azienda) indica per GBD il tipo del core (`Utenza`) e l'id company del core.
@@ -63,7 +63,7 @@ Per le company con `produce_documents = false` gli stati restano `perfezionata` 
 - Core: migrazione `tasks.company_id` e seeder GBD ripetibile (suite del core).
 
 ## Rischi
-- Scrittura sul DB condiviso `unico_core_test` (schema e dati): backup e ok esplicito prima di applicare.
+- Scrittura sul DB condiviso `unicosuite_test` (schema e dati): backup e ok esplicito prima di applicare.
 - Il contratto Edison e le chiavi Yousign non ci sono ancora: si parte con la sola informativa e provider `fake`.
 - Il webhook richiede un URL pubblico raggiungibile da Yousign.
 - WhatsApp: oltre le 24 ore dall'ultimo messaggio dell'installatore l'avviso automatico non parte; restano mail e «Stato pratiche».

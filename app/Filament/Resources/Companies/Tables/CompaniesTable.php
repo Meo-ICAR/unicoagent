@@ -16,11 +16,11 @@ class CompaniesTable
         return $table
             ->columns([
                 TextColumn::make('name')->label('Ragione sociale')->searchable(),
-                TextColumn::make('whatsapp_number')->label('WhatsApp')->placeholder('-')->icon(Heroicon::OutlinedChatBubbleLeftRight)
-                    ->url(fn (Company $record) => filled($record->whatsapp_number) ? route('filament.admin.resources.conversations.index', [
+                TextColumn::make('whatsapp_number')->label('WhatsApp')->placeholder('-')->state(fn (Company $record) => $record->whatsappNumber())->icon(Heroicon::OutlinedChatBubbleLeftRight)
+                    ->url(fn (Company $record) => filled($record->whatsappNumber()) ? route('filament.admin.resources.conversations.index', [
                         'filters' => [
                             'company_id' => ['value' => $record->id],
-                            'wa_number' => ['wa_number' => $record->whatsapp_number],
+                            'wa_number' => ['wa_number' => $record->whatsappNumber()],
                         ],
                     ]) : null)
                     ->openUrlInNewTab(),

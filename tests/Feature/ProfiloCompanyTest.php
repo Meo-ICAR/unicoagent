@@ -51,8 +51,8 @@ class ProfiloCompanyTest extends TestCase
     public function test_si_modifica_la_company_dal_pannello_con_settore_prova_contratto_e_prodotti(): void
     {
         $company = Company::create(['name' => 'Hassisto']);
-        $p1 = Product::create(['type' => 'FINANCE', 'name' => 'Cessione del quinto']);
-        $p2 = Product::create(['type' => 'FINANCE', 'name' => 'Mutuo']);
+        $p1 = Product::create(['type' => 'CALL CENTER', 'name' => 'Cessione del quinto']);
+        $p2 = Product::create(['type' => 'CALL CENTER', 'name' => 'Mutuo']);
 
         Livewire::test(EditCompany::class, ['record' => $company->getRouteKey()])
             ->fillForm([
@@ -65,9 +65,19 @@ class ProfiloCompanyTest extends TestCase
         $this->assertTrue($company->is_trial);
         $this->assertSame('2026-10-31', $company->trialend_at->toDateString());
         $this->assertSame('2026-10-01', $company->trial_activated_at->toDateString());
-        $this->assertSame('2026-11-05', $company->activated_at->toDateString());
+        $this->assertNull($company->activated_at, 'in prova la data del contratto è nascosta e non si salva');
         $this->assertSame('+39 333 1234567', $company->whatsapp_number);
         $this->assertEqualsCanonicalizing([$p1->id, $p2->id], $company->products()->pluck('products.id')->all());
+    }
+
+    public function test_i_prodotti_attivi_sono_solo_quelli_del_settore_della_company(): void
+    {
+        $company = Company::create(['name' => 'Hassisto', 'type' => 'HOTEL']);
+        $energy = Product::create(['type' => 'ENERGY', 'name' => 'Luce']);
+
+        Livewire::test(EditCompany::class, ['record' => $company->getRouteKey()])
+            ->fillForm(['products' => [$energy->id]])->call('save')
+            ->assertHasFormErrors(['products.0']);
     }
 
     public function test_il_settore_deve_essere_uno_di_quelli_previsti(): void

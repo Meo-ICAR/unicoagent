@@ -15,6 +15,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 
@@ -33,11 +34,11 @@ class CompanyForm
                         ->url(fn (?Company $record) => route('filament.admin.resources.conversations.index', [
                             'filters' => [
                                 'company_id' => ['value' => $record->id],
-                                'wa_number' => ['wa_number' => $record->whatsapp_number],
+                                'wa_number' => ['wa_number' => $record->whatsappNumber()],
                             ],
                         ]))
                         ->openUrlInNewTab()
-                        ->visible(fn (?Company $record) => filled($record?->whatsapp_number))
+                        ->visible(fn (?Company $record) => filled($record?->whatsappNumber()))
                 ),
 
             Section::make('Azienda e privacy')->collapsed()->columns(2)
@@ -121,12 +122,15 @@ class CompanyForm
                 ->columnSpanFull()
                 ->columns(4)
                 ->schema([
-                    Select::make('type')->label('Settore')->options(Company::TYPES)->required()->default('FINANCE'),
-                    Select::make('products')->label('Prodotti attivi')->relationship('products', 'name')->multiple()->preload(),
+                    Select::make('type')->label('Settore')->options(Company::TYPES)->required()->default('FINANCE')
+                        ->live()->afterStateUpdated(fn (Set $set) => $set('products', [])),
+                    Select::make('products')->label('Prodotti attivi')
+                        ->relationship('products', 'name', fn ($query, Get $get) => $query->where('type', $get('type')))
+                        ->multiple()->preload(),
                     Toggle::make('is_trial')->label('In prova (trial)')->live(),
-                    DatePicker::make('trial_activated_at')->label('Prova attivata il'),
+                    DatePicker::make('trial_activated_at')->label('Prova attivata il')->visible(fn ($get) => (bool) $get('is_trial')),
                     DatePicker::make('trialend_at')->label('La prova termina il')->visible(fn ($get) => (bool) $get('is_trial')),
-                    DatePicker::make('activated_at')->label('Contratto attivato il'),
+                    DatePicker::make('activated_at')->label('Contratto attivato il')->visible(fn ($get) => ! $get('is_trial')),
                     FileUpload::make('logo')->label('Logo')->image()->disk('public')->directory('company-logos')->visibility('public'),
                     KeyValue::make('menu.options')->label('Voci del menu WhatsApp (id → titolo)')->columnSpanFull()
                         ->keyLabel('Id')->valueLabel('Titolo (max 24 caratteri)')

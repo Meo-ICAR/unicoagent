@@ -8,10 +8,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
+use Unico\Core\Models\Company;
 use Unico\Core\Models\DocumentType;
 use Unico\Core\Models\PdfModule;
 
-/** Test che usano le tabelle del core: DB `unico_core_phpunit` con rollback; il resto sta su sqlite in memoria. */
+/** Test che usano le tabelle del core: DB `unico_core_phpunit` con rollback; il resto sta su MySQL (unicoagent_test). */
 abstract class CoreTestCase extends TestCase
 {
     use RefreshDatabase;
@@ -47,9 +48,9 @@ abstract class CoreTestCase extends TestCase
     }
 
     /** Una company del core (le chiavi esterne di tasks e documents ne vogliono una vera). */
-    protected function coreCompany(string $name = 'GBD Energy'): \Unico\Core\Models\Company
+    protected function coreCompany(string $name = 'GBD Energy'): Company
     {
-        return \Unico\Core\Models\Company::create(['name' => $name.' '.uniqid()]);
+        return Company::create(['name' => $name.' '.uniqid()]);
     }
 
     protected function fixturePdf(): string

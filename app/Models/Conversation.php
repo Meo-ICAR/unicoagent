@@ -30,7 +30,7 @@ class Conversation extends Model
     public function scopeAbandoned(Builder $query): Builder
     {
         return $query->where('status', 'attiva')->where('updated_at', '<', now()->subMinutes(self::UNTOUCHED_MINUTES))
-            ->where(fn ($q) => $q->whereNull('history')->orWhere('history', '[]'));
+            ->where(fn ($q) => $q->whereNull('history')->orWhereJsonLength('history', 0));
     }
 
     /** Il produttore (agente) il cui telefono coincide con il numero WhatsApp della conversazione. */

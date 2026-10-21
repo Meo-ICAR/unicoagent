@@ -34,6 +34,8 @@ final class LeadParameters
             'email' => $personal['email'] ?? null,
             'fonte' => (string) config('finanziamento.lead.fonte', 'unicoagent'),
             'annotazioni' => self::notes($loan, $answers, $band),
+            'codice_fiscale' => $personal['codice_fiscale'] ?? null,
+            'codice_fiscale_agente' => Fornitore::findByWhatsApp((string) $loan->agent_wa_number)?->cf,
         ], fn ($value) => $value !== null && $value !== '');
     }
 

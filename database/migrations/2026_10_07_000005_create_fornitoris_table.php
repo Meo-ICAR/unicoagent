@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * Anagrafica agenti / collaboratori (Fornitori).
  *
  * Schema allineato a unico-core (id bigint). In produzione il modello usa la connessione `core`
- * (unico_core_test); questa migrazione serve ai test e agli ambienti senza la tabella già presente.
+ * (unicosuite_test); questa migrazione serve ai test e agli ambienti senza la tabella già presente.
  */
 return new class extends Migration
 {

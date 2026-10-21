@@ -15,7 +15,7 @@
 - Tutto il testo per l'utente in italiano; commit con `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 - Si lavora su `main`, senza branch; push solo su richiesta dell'utente. Non si mettono nel commit le modifiche dell'utente già presenti nel working tree.
 - Opt-in: senza `companies.produce_documents` il comportamento resta quello di oggi (il finanziamento non cambia; stato `perfezionata`).
-- Il DB condiviso `unico_core_test` (connessione `core`) si modifica solo con l'ok esplicito dell'utente, dopo backup; i test usano `unico_core_phpunit`.
+- Il DB condiviso `unicosuite_test` (connessione `core`) si modifica solo con l'ok esplicito dell'utente, dopo backup; i test usano `unico_core_phpunit`.
 - Nessun dato personale nei log: solo codice pratica e tipo di errore.
 - Stati di GBD: `invio_istruttoria` («INVIO IN ISTRUTTORIA») al «Conferma»; `perfezionare` («PERFEZIONARE») a firme complete; `ALLA FIRMA` è solo il valore di stato di firma (`signature_status`: `in_attesa`, `firmata`, `scaduta`, `rifiutata`, `errore`) e il nome del task dei documenti da firmare.
 - Evento `pratica.perfezionata` a UnicoBPM, per le company con `produce_documents`, solo alla firma completata.
@@ -1738,7 +1738,7 @@ git commit -m "feat: GbdEnergySeeder scrive stati, task e requisiti di GBD nel c
 
 - [ ] **Step 4: Attivazione sul DB reale (SOLO con l'ok esplicito dell'utente)**
 
-Non eseguire senza che l'utente abbia detto di procedere. Prima: backup del DB `unico_core_test` (`mysqldump` con le credenziali del `.env` nella scratchpad). Poi, in quest'ordine:
+Non eseguire senza che l'utente abbia detto di procedere. Prima: backup del DB `unicosuite_test` (`mysqldump` con le credenziali del `.env` nella scratchpad). Poi, in quest'ordine:
 
 ```bash
 cd /var/www/html/unicoagent
