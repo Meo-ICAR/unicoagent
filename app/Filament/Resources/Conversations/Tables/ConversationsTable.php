@@ -39,14 +39,9 @@ class ConversationsTable
                 TextColumn::make('updated_at')->label('Ultimo messaggio')->dateTime()->sortable(),
             ])
             ->filters([
+
+                SelectFilter::make('flow')->label('Percorso')->options(self::FLOWS),
                 CurrentCompany::filter(),
-                Filter::make('wa_number')->label('Telefono')
-                    ->schema([TextInput::make('wa_number')->label('Telefono')])
-                    ->query(fn ($query, array $data) => $query->when(
-                        filled($data['wa_number'] ?? null),
-                        fn ($query) => $query->where('wa_number', 'like', '%'.ltrim(preg_replace('/\D+/', '', $data['wa_number']), '0').'%'),
-                    ))
-                    ->indicateUsing(fn (array $data) => filled($data['wa_number'] ?? null) ? 'Telefono: '.$data['wa_number'] : null),
                 SelectFilter::make('fornitore')->label('Produttore')->searchable()
                     ->options(fn () => Fornitore::query()->whereNotNull('tel')->orderBy('name')->pluck('name', 'id')->all())
                     ->query(function (Builder $query, array $data): Builder {
@@ -58,7 +53,14 @@ class ConversationsTable
                             : $query;
                     }),
                 SelectFilter::make('status')->label('Stato')->options(self::STATUSES),
-                SelectFilter::make('flow')->label('Percorso')->options(self::FLOWS),
+                Filter::make('wa_number')->label('Telefono')
+                    ->schema([TextInput::make('wa_number')->label('Telefono')])
+                    ->query(fn ($query, array $data) => $query->when(
+                        filled($data['wa_number'] ?? null),
+                        fn ($query) => $query->where('wa_number', 'like', '%'.ltrim(preg_replace('/\D+/', '', $data['wa_number']), '0').'%'),
+                    ))
+                    ->indicateUsing(fn (array $data) => filled($data['wa_number'] ?? null) ? 'Telefono: '.$data['wa_number'] : null),
+
             ])
             ->recordActions([ViewAction::make()])
             ->toolbarActions([BulkActionGroup::make([DeleteBulkAction::make()])]);

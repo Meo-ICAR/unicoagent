@@ -9,6 +9,7 @@ use App\Filament\Resources\FinanziamentoDocuments\Pages\CreateFinanziamentoDocum
 use App\Filament\Resources\Fornitori\FornitoreResource;
 use App\Filament\Resources\Fornitori\Pages\EditFornitore;
 use App\Filament\Resources\LoanRequests\Pages\EditLoanRequest;
+use App\Filament\Resources\LoanRequests\Pages\ListLoanRequests;
 use App\Filament\Resources\LoanRequests\Pages\ViewLoanRequest;
 use App\Filament\Resources\LoanRequests\RelationManagers\AttachmentsRelationManager;
 use App\Filament\Resources\LoanRequests\RelationManagers\PraticaDocumentsRelationManager;
@@ -129,6 +130,21 @@ class FilamentAdminTest extends TestCase
 
         $this->assertSame(0, Conversation::count());
         $this->assertSame(0, ConversationMessage::count());
+    }
+
+    public function test_le_pratiche_si_eliminano_in_blocco_e_le_conversazioni_restano_senza_pratica(): void
+    {
+        $loan = $this->loan();
+        $conv = Conversation::create(['wa_number' => '393331112222', 'flow' => 'richiesta', 'node' => 'prodotto', 'loan_request_id' => $loan->id, 'data' => [], 'history' => []]);
+        $this->login();
+
+        Livewire::test(ListLoanRequests::class)
+            ->selectTableRecords([$loan->id])
+            ->callAction(TestAction::make('delete')->table()->bulk())
+            ->assertNotified();
+
+        $this->assertSame(0, LoanRequest::count());
+        $this->assertNull($conv->fresh()->loan_request_id);
     }
 
     public function test_i_produttori_sono_in_anagrafiche_e_si_modificano_ma_non_si_creano(): void
