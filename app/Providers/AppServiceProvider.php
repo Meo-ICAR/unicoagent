@@ -37,6 +37,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Le viste compilate da un altro utente (artisan e test da terminale) non si possono aggiornare da Apache («Utime failed»):
+        // da console ogni utente diverso da www-data compila in una cartella sua.
+        $user = function_exists('posix_geteuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? null) : null;
+        if ($this->app->runningInConsole() && $user !== null && $user !== 'www-data') {
+            config(['view.compiled' => storage_path("framework/views-{$user}")]);
+        }
+
         // L'albero delle conversazioni resta in memoria per la richiesta; i modelli lo invalidano quando cambiano.
         $this->app->singleton(FlowRepository::class);
         $this->app->singleton(CheckRegistry::class);
