@@ -39,6 +39,15 @@ XML;
         $this->assertSame([['valid' => true, 'erogato' => 20000.0]], MediafacileClient::parse($xml));
     }
 
+    public function test_l_erogato_x100_oltre_il_capitale_si_scala_senza_toccare_le_altre_offerte(): void
+    {
+        $record = fn (string $bank, string $erogato) => '<record><field name="Denominazione_istituto"><data>'.$bank.'</data></field><field name="Importo_capitale"><data>3600000</data></field>'
+            .'<field name="Importo_erogato"><data>'.$erogato.'</data></field><field name="Errore"><data>2</data></field></record>';
+        $xml = '<fmresultset xmlns="http://www.filemaker.com/xml/fmresultset"><resultset>'.$record('CAPITALFIN', '24389,51').$record('FIGENPA', '2103864,37').'</resultset></fmresultset>';
+
+        $this->assertSame([24389.51, 21038.6437], array_column(MediafacileClient::offers($xml), 'erogato'));
+    }
+
     public function test_un_xml_non_valido_o_senza_offerte(): void
     {
         $this->assertSame([], MediafacileClient::parse('<Offerte/>'));
