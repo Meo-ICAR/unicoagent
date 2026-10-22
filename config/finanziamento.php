@@ -110,7 +110,7 @@ return [
     // Preventivatore: driver `random` (simulazione) o `mediafacile` (servizio di simulazione, specifica 3.8).
     'quote' => [
         'driver' => env('QUOTE_DRIVER', 'random'),
-        'timeout' => 15,
+        'timeout' => (int) env('MEDIAFACILE_TIMEOUT', 15),
         'default_sex' => 'M',
         // Anzianità assunta quando non è chiesta (pensionati).
         'default_seniority_years' => 20,
