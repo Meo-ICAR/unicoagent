@@ -7,7 +7,6 @@ use App\Models\LoanRequest;
 use App\Services\Crm\Capabilities\FillsForms;
 use App\Services\Crm\Capabilities\RequestsSignature;
 use App\Services\Crm\Capabilities\SendsDocuments;
-use App\Services\Crm\CompanyCrmGateway;
 use App\Services\Crm\CrmGateway;
 use App\Services\Crm\CrmRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -56,6 +55,16 @@ class CompanyCrmGatewayTest extends TestCase
         Http::fake(['crm.example.com/*' => Http::response(['ok' => true], 201)]);
 
         $this->assertSame(200, $this->gateway()->submit($this->loan(), ['cognome' => 'Rossi']));
+        Http::assertSentCount(1);
+    }
+
+    public function test_il_driver_dell_azienda_vince_sulla_simulazione_globale(): void
+    {
+        Company::create(['name' => 'A', 'crm_driver' => 'generic', 'crm_config' => ['url' => 'https://crm.example.com/api/pratiche']]);
+        Http::fake(['crm.example.com/*' => Http::response(['ok' => true], 201)]);
+        config(['finanziamento.crm.driver' => 'simulated']);
+
+        $this->assertSame(200, app(CrmGateway::class)->submit($this->loan(), ['cognome' => 'Rossi']));
         Http::assertSentCount(1);
     }
 
