@@ -7,14 +7,15 @@ use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Models\Company;
 use App\Models\Product;
+use App\Support\TenantUser;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -27,6 +28,12 @@ use UnitEnum;
 /** Prodotti del catalogo per settore: si associano alle company dalla loro scheda. */
 class ProductResource extends Resource
 {
+    /** Catalogo comune a tutte le aziende: lo gestisce solo il super admin. */
+    public static function canAccess(): bool
+    {
+        return TenantUser::isSuperAdmin();
+    }
+
     protected static ?string $model = Product::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCube;

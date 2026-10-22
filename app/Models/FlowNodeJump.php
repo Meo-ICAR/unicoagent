@@ -10,6 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** Un salto: quando la risposta (o il dato) vale `when_value`, il dialogo prosegue dalla domanda `go_to`. */
 class FlowNodeJump extends Model
 {
+    /** Si raggiunge dal percorso (Flow), che ha già il filtro per company. */
+    protected static function isScopedByCompany(): bool
+    {
+        return false;
+    }
+
     use BelongsToCompany;
 
     protected $guarded = [];

@@ -12,6 +12,10 @@ class CurrentCompany
 
     public static function id(): ?int
     {
+        if (($own = TenantUser::companyId()) !== null) {
+            return $own;
+        }
+
         $id = session(self::KEY);
 
         return $id !== null && Company::whereKey($id)->exists() ? (int) $id : null;

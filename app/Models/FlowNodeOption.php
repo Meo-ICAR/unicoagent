@@ -10,6 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** Un'opzione di risposta di una domanda a scelta. */
 class FlowNodeOption extends Model
 {
+    /** Si raggiunge dal percorso (Flow), che ha già il filtro per company. */
+    protected static function isScopedByCompany(): bool
+    {
+        return false;
+    }
+
     use BelongsToCompany;
 
     protected $guarded = [];

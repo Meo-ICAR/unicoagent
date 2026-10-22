@@ -11,6 +11,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** Una domanda di un percorso. */
 class FlowNode extends Model
 {
+    /** Si raggiunge dal percorso (Flow), che ha già il filtro per company. */
+    protected static function isScopedByCompany(): bool
+    {
+        return false;
+    }
+
     use BelongsToCompany;
 
     protected $guarded = [];

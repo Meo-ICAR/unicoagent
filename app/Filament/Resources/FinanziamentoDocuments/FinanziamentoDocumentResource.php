@@ -8,6 +8,7 @@ use App\Filament\Resources\FinanziamentoDocuments\Pages\ListFinanziamentoDocumen
 use App\Filament\Resources\FinanziamentoDocuments\Schemas\FinanziamentoDocumentForm;
 use App\Filament\Resources\FinanziamentoDocuments\Tables\FinanziamentoDocumentsTable;
 use App\Models\FinanziamentoDocument;
+use App\Support\TenantUser;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -17,6 +18,12 @@ use UnitEnum;
 
 class FinanziamentoDocumentResource extends Resource
 {
+    /** Catalogo comune a tutte le aziende: lo gestisce solo il super admin. */
+    public static function canAccess(): bool
+    {
+        return TenantUser::isSuperAdmin();
+    }
+
     protected static ?string $model = FinanziamentoDocument::class;
 
     protected static ?string $modelLabel = 'documento del finanziamento';

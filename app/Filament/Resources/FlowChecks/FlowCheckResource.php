@@ -7,6 +7,7 @@ use App\Filament\Resources\FlowChecks\Pages\ListFlowChecks;
 use App\Filament\Resources\FlowChecks\Schemas\FlowCheckForm;
 use App\Filament\Resources\FlowChecks\Tables\FlowChecksTable;
 use App\Models\FlowCheck;
+use App\Support\TenantUser;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -16,6 +17,12 @@ use UnitEnum;
 
 class FlowCheckResource extends Resource
 {
+    /** Catalogo comune a tutte le aziende: lo gestisce solo il super admin. */
+    public static function canAccess(): bool
+    {
+        return TenantUser::isSuperAdmin();
+    }
+
     protected static ?string $model = FlowCheck::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;

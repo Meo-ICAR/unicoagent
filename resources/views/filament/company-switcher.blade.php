@@ -1,3 +1,4 @@
+@if (\App\Support\TenantUser::isSuperAdmin())
 <form method="POST" action="{{ route('company.switch') }}" class="flex items-center px-2">
     @csrf
     <select name="company_id" onchange="this.form.submit()" aria-label="Azienda"
@@ -8,3 +9,4 @@
         @endforeach
     </select>
 </form>
+@endif

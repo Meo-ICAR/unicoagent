@@ -8,15 +8,28 @@ use App\Filament\Resources\Companies\Pages\ListCompanies;
 use App\Filament\Resources\Companies\Schemas\CompanyForm;
 use App\Filament\Resources\Companies\Tables\CompaniesTable;
 use App\Models\Company;
+use App\Support\TenantUser;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 class CompanyResource extends Resource
 {
+    /** Le aziende le elimina solo il super admin. */
+    public static function canDelete(Model $record): bool
+    {
+        return TenantUser::isSuperAdmin();
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return TenantUser::isSuperAdmin();
+    }
+
     protected static ?string $model = Company::class;
 
     protected static ?string $modelLabel = 'azienda';
@@ -28,7 +41,7 @@ class CompanyResource extends Resource
     /** L'installazione serve una sola azienda: se esiste già si modifica quella. */
     public static function canCreate(): bool
     {
-        return ! Company::exists();
+        return TenantUser::isSuperAdmin() && ! Company::exists();
     }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CompanyScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
@@ -12,6 +13,12 @@ class Company extends Model
     public const TYPES = ['FINANCE' => 'Finance', 'CALL CENTER' => 'Call center', 'HOTEL' => 'Hotel', 'ENERGY' => 'Energia'];
 
     protected $guarded = [];
+
+    /** Un utente legato a una company vede solo la sua. */
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new CompanyScope('id'));
+    }
 
     protected function casts(): array
     {
