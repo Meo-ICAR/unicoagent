@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Filament\Resources\Attachments\Pages\ListAttachments;
 use App\Filament\Resources\Companies\Pages\EditCompany;
+use App\Filament\Resources\Conversations\Pages\ListConversations;
 use App\Filament\Resources\FinanziamentoDocuments\Pages\CreateFinanziamentoDocument;
 use App\Filament\Resources\Fornitori\FornitoreResource;
 use App\Filament\Resources\Fornitori\Pages\EditFornitore;
@@ -16,6 +17,7 @@ use App\Jobs\AnalyzeAttachment;
 use App\Models\Attachment;
 use App\Models\Company;
 use App\Models\Conversation;
+use App\Models\ConversationMessage;
 use App\Models\Fornitore;
 use App\Models\LoanRequest;
 use App\Models\PraticaDocument;
@@ -100,6 +102,33 @@ class FilamentAdminTest extends TestCase
         $this->login();
 
         $this->get('/admin/conversations')->assertOk()->assertSee('Produttore')->assertSee('Agenzia Bianchi')->assertSee('393339999999');
+    }
+
+    public function test_le_conversazioni_hanno_iterazioni_filtro_e_ordinamento_per_produttore_ed_eliminazione_multipla(): void
+    {
+        $bianchi = Fornitore::create(['name' => 'Agenzia Bianchi', 'tel' => '+39 333 111 2222', 'is_active' => true]);
+        $rossi = Fornitore::create(['name' => 'Agenzia Rossi', 'tel' => '3334445555', 'is_active' => true]);
+        $a = Conversation::create(['wa_number' => '393331112222', 'flow' => 'richiesta', 'node' => 'prodotto', 'data' => [], 'history' => []]);
+        $b = Conversation::create(['wa_number' => '393334445555', 'flow' => 'richiesta', 'node' => 'prodotto', 'data' => [], 'history' => []]);
+        ConversationMessage::factory()->count(3)->create(['conversation_id' => $a->id, 'wa_number' => $a->wa_number]);
+        $this->login();
+
+        Livewire::test(ListConversations::class)
+            ->assertCanSeeTableRecords([$a, $b])
+            ->assertTableColumnStateSet('messages_count', 3, $a)
+            ->assertTableColumnStateSet('messages_count', 0, $b)
+            ->filterTable('fornitore', $rossi->id)
+            ->assertCanSeeTableRecords([$b])
+            ->assertCanNotSeeTableRecords([$a])
+            ->removeTableFilters()
+            ->sortTable('fornitore', 'desc')
+            ->assertCanSeeTableRecords([$b, $a], inOrder: true)
+            ->selectTableRecords([$a->id, $b->id])
+            ->callAction(TestAction::make('delete')->table()->bulk())
+            ->assertNotified();
+
+        $this->assertSame(0, Conversation::count());
+        $this->assertSame(0, ConversationMessage::count());
     }
 
     public function test_i_produttori_sono_in_anagrafiche_e_si_modificano_ma_non_si_creano(): void
