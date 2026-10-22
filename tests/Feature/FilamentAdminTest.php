@@ -132,6 +132,18 @@ class FilamentAdminTest extends TestCase
         $this->assertSame(0, ConversationMessage::count());
     }
 
+    public function test_le_pratiche_mostrano_il_nome_dell_agente_invece_del_numero(): void
+    {
+        Fornitore::create(['name' => 'Agenzia Bianchi', 'tel' => '+39 333 111 2222', 'is_active' => true]);
+        $known = $this->loan();
+        $unknown = LoanRequest::create(['code' => 'FIN-2026-0002', 'agent_wa_number' => '393339999999', 'product' => 'personale', 'status' => 'richiesta', 'answers' => []]);
+        $this->login();
+
+        Livewire::test(ListLoanRequests::class)
+            ->assertTableColumnStateSet('agent_wa_number', 'Agenzia Bianchi', $known)
+            ->assertTableColumnStateSet('agent_wa_number', '393339999999', $unknown);
+    }
+
     public function test_le_pratiche_si_eliminano_in_blocco_e_le_conversazioni_restano_senza_pratica(): void
     {
         $loan = $this->loan();

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\LoanRequests\Tables;
 
 use App\Models\Attachment;
+use App\Models\Fornitore;
 use App\Models\LoanRequest;
 use App\Services\Crm\LoanEmailSender;
 use App\Support\CurrentCompany;
@@ -17,9 +18,26 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
+use Unico\Core\Signature\PhoneNumber;
 
 class LoanRequestsTable
 {
+    /**
+     * Nome dei produttori per telefono (forma nazionale), letto una volta per richiesta.
+     *
+     * @return array<string, string>
+     */
+    private static function agentNames(): array
+    {
+        if (! app()->bound(self::class)) {
+            app()->scoped(self::class, fn () => Fornitore::query()->whereNotNull('tel')->get()
+                ->mapWithKeys(fn (Fornitore $f) => [PhoneNumber::national($f->tel) => $f->display_name])
+                ->filter()->all());
+        }
+
+        return app(self::class);
+    }
+
     public static function configure(Table $table): Table
     {
         return $table
@@ -28,7 +46,9 @@ class LoanRequestsTable
                 TextColumn::make('code')->label('Codice')->searchable()->sortable(),
                 TextColumn::make('is_test')->label('Origine')->badge()->color(fn (bool $state) => $state ? 'warning' : 'gray')
                     ->formatStateUsing(fn (bool $state) => $state ? 'Prova' : 'Reale'),
-                TextColumn::make('agent_wa_number')->label('Agente')->searchable(),
+                TextColumn::make('agent_wa_number')->label('Agente')->searchable()
+                    ->state(fn (LoanRequest $record) => self::agentNames()[PhoneNumber::national($record->agent_wa_number)] ?? $record->agent_wa_number)
+                    ->tooltip(fn (LoanRequest $record) => $record->agent_wa_number),
                 TextColumn::make('product')->label('Prodotto')
                     ->formatStateUsing(fn (string $state, LoanRequest $record) => LoanRequest::productLabels($record->company_id)[$state] ?? $state),
                 TextColumn::make('signature_status')->label('Firma')->badge()->toggleable()
