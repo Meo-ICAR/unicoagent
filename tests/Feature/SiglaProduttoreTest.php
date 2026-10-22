@@ -12,7 +12,7 @@ class SiglaProduttoreTest extends ConversationTestCase
 {
     use RefreshDatabase;
 
-    private const FLOW = ['#menu_richiedi', '#personale', '#imp_5k', '#m24', '#eta_40', '#sesso_m', '#dip_priv', '#det', '#anz_1', '#red_1500', '#no', '#no', '#conferma'];
+    private const FLOW = ['#menu_richiedi', '#personale', '#imp_5k', '#m24', '#eta_40', '#sesso_m', '#dip_priv', '#det', '#anz_1', '#red_1500', '#no', '#no', '3', '#conferma'];
 
     private function producer(array $o = []): Fornitore
     {

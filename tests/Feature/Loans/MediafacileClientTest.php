@@ -47,20 +47,17 @@ XML;
         MediafacileClient::parse('questo non è xml');
     }
 
-    public function test_invia_passkey_e_parametri_nell_url_in_post_e_restituisce_il_corpo(): void
+    public function test_invia_passkey_e_parametri_in_post_come_form_e_restituisce_il_corpo(): void
     {
         Http::fake(['crm.example.com/*' => Http::response(self::XML)]);
 
         $body = (new MediafacileClient)->request('https://crm.example.com/ws/offerte', 'KEY', ['Tipo_contratto' => 'Cessione', 'Durata' => '60']);
 
         $this->assertSame(self::XML, $body);
-        Http::assertSent(function (Request $r) {
-            parse_str((string) parse_url($r->url(), PHP_URL_QUERY), $query);
-
-            return $r->method() === 'POST'
-                && str_starts_with($r->url(), 'https://crm.example.com/ws/offerte?')
-                && $query === ['Passkey' => 'KEY', 'Tipo_contratto' => 'Cessione', 'Durata' => '60'];
-        });
+        Http::assertSent(fn (Request $r) => $r->method() === 'POST'
+            && $r->isForm()
+            && $r->url() === 'https://crm.example.com/ws/offerte'
+            && $r->data() === ['passkey' => 'KEY', 'Tipo_contratto' => 'Cessione', 'Durata' => '60']);
     }
 
     public function test_un_errore_http_o_di_connessione_diventa_quote_unavailable(): void

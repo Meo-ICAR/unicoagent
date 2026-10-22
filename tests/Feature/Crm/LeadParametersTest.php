@@ -46,6 +46,21 @@ class LeadParametersTest extends TestCase
         $this->assertArrayNotHasKey('Passkey', $p);
     }
 
+    public function test_per_la_cessione_la_tipologia_viene_dal_tipo_di_rapporto_scelto(): void
+    {
+        $tipologia = function (array $answers): ?string {
+            $loan = $this->loan();
+            $loan->answers = $answers + $loan->answers;
+
+            return LeadParameters::build($loan, $this->personal())['tipologia'] ?? null;
+        };
+
+        $this->assertSame('Privato', $tipologia(['tipo_rapporto' => 'privato_spa']));
+        $this->assertSame('Pensionato altri enti', $tipologia(['tipo_rapporto' => 'pensionato_inpdap']));
+        $this->assertSame('Privato small business', $tipologia(['tipo_rapporto' => 'privato_small_business']));
+        $this->assertSame('Ferroviere', $tipologia(['tipo_rapporto' => 'altro', 'tipo_rapporto_altro' => 'ferroviere']));
+    }
+
     public function test_le_annotazioni_riassumono_la_pratica_senza_dati_sensibili(): void
     {
         Fornitore::create(['name' => 'Mario', 'tel' => '393331112222', 'sigla' => 'PM', 'is_active' => true]);

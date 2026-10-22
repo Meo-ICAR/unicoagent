@@ -72,7 +72,14 @@ class FinanziamentoConfigTest extends TestCase
         $forbidden = ['nome', 'cognome', 'codice_fiscale', 'telefono', 'email', 'ragione_sociale', 'partita_iva', 'residenza'];
 
         $this->assertSame([], array_intersect($forbidden, array_keys(config('finanziamento.flows.richiesta.nodes'))));
+        // Testo ammesso solo per i parametri del simulatore: date, importo della rata e punti, senza nome né recapiti.
+        $simulatorInputs = ['data_nascita', 'data_assunzione', 'importo_rata', 'punti'];
         foreach (config('finanziamento.flows.richiesta.nodes') as $name => $node) {
+            if (in_array($name, $simulatorInputs, true)) {
+                $this->assertSame('text', $node['type']);
+
+                continue;
+            }
             $this->assertNotContains($node['type'], ['text', 'file'], "richiesta.$name non deve essere testo libero o file");
         }
     }

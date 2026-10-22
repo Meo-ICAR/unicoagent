@@ -16,6 +16,11 @@ class FasceChiuseMigrationTest extends TestCase
     private function migrate(): void
     {
         (require database_path('migrations/2026_10_08_000003_closed_bands_age_and_sex_in_richiesta.php'))->up();
+        // Le modifiche successive all'albero (punti da caricare, dati esatti per la cessione).
+        (require database_path('migrations/2026_10_21_160000_add_punti_node_to_richiesta_flows.php'))->up();
+        (require database_path('migrations/2026_10_22_100000_cessione_exact_inputs_in_richiesta_flows.php'))->up();
+        (require database_path('migrations/2026_10_22_110000_quinto_tipo_rapporto_in_richiesta_flows.php'))->up();
+        (require database_path('migrations/2026_10_22_120000_quinto_eta_e_anzianita_a_fasce_in_richiesta_flows.php'))->up();
         app(FlowRepository::class)->forget();
     }
 
@@ -27,6 +32,15 @@ class FasceChiuseMigrationTest extends TestCase
     /** Riporta l'albero come in produzione prima della modifica. */
     private function age(Flow $flow): void
     {
+        // Le domande aggiunte dopo (punti, tipo di rapporto, rata) e le uscite che le usano: l'albero com'era prima.
+        $flow->nodes()->whereIn('code', ['punti', 'importo_rata', 'tipo_rapporto', 'tipo_rapporto_altro'])->get()->each->delete();
+        $jump = fn (string $node, string $when, string $goTo) => $flow->nodes()->where('code', $node)->firstOrFail()->jumps()->where('when_value', $when)->update(['go_to' => $goTo]);
+        $jump('prodotto', 'quinto', 'importo');
+        $jump('quote_cedute', '*', 'riepilogo');
+        $flow->nodes()->where('code', 'crif')->firstOrFail()->jumps()->where('when_value', 'personale')->delete();
+        $flow->nodes()->where('code', 'anzianita')->firstOrFail()->jumps()->delete();
+        $flow->nodes()->where('code', 'anzianita')->firstOrFail()->update(['jump_by' => 'answer']);
+        $flow->nodes()->where('code', 'anzianita')->firstOrFail()->jumps()->create(['when_value' => '*', 'go_to' => 'reddito', 'sort_order' => 99]);
         $flow->nodes()->whereIn('code', ['eta', 'sesso'])->get()->each->delete();
         $flow->nodes()->where('code', 'durata')->firstOrFail()->jumps()->whereIn('when_value', ['personale', 'quinto'])->update(['go_to' => 'lavoro']);
         $flow->nodes()->orderBy('sort_order')->pluck('code')->each(fn ($code, $i) => $flow->nodes()->where('code', $code)->update(['sort_order' => $i + 1]));

@@ -6,13 +6,14 @@ use App\Mail\QuoteMail;
 use App\Models\Company;
 use App\Models\Fornitore;
 use App\Models\LoanRequest;
+use App\Services\Loans\CompanyLoanEstimator;
 use App\Services\Loans\LoanEstimator;
 use App\Services\Loans\RandomLoanEstimator;
 use Illuminate\Support\Facades\Mail;
 
 class ImportiOttenibiliTest extends ConversationTestCase
 {
-    private const FLOW = ['#menu_richiedi', '#personale', '#imp_5k', '#m24', '#eta_40', '#sesso_m', '#dip_priv', '#det', '#anz_1', '#red_1500', '#no', '#no', '#conferma'];
+    private const FLOW = ['#menu_richiedi', '#personale', '#imp_5k', '#m24', '#eta_40', '#sesso_m', '#dip_priv', '#det', '#anz_1', '#red_1500', '#no', '#no', '3', '#conferma'];
 
     private function fixedEstimator(): void
     {
@@ -32,7 +33,7 @@ class ImportiOttenibiliTest extends ConversationTestCase
             $this->assertLessThan($r['max'], $r['min']);
             $this->assertGreaterThan(0, $r['min']);
         }
-        $this->assertInstanceOf(RandomLoanEstimator::class, app(LoanEstimator::class));
+        $this->assertInstanceOf(CompanyLoanEstimator::class, app(LoanEstimator::class));
     }
 
     public function test_un_produttore_riceve_l_importo_minimo_e_massimo(): void

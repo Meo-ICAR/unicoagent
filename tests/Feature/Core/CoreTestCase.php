@@ -39,12 +39,26 @@ abstract class CoreTestCase extends TestCase
         // Nessuna chiamata esterna vera (WhatsApp, Yousign...): i test non devono scrivere a nessuno.
         Http::fake();
         config(['services.whatsapp.token' => 'TEST-TOKEN', 'services.whatsapp.phone_number_id' => '0']);
+        // UnicoBPM configurato ma finto (Http::fake): gli eventi vengono messi in coda e non partono davvero.
+        config(['services.bpm.url' => 'https://bpm.example.com', 'services.bpm.key' => 'chiave-bpm']);
 
         Storage::fake('documents');
         Storage::fake(config('unico-core.pdf.modules_disk', 'public'));
 
         DB::connection('core')->beginTransaction();
         $this->beforeApplicationDestroyed(fn () => DB::connection('core')->rollBack());
+    }
+
+    /**
+     * L'agente sta nel core con company_id = id locale della company, e la chiave esterna vuole una company core con quell'id.
+     * Con MySQL gli id locali non ripartono da 1 a ogni test: si specchia il prossimo id che la company locale riceverà.
+     */
+    protected function mirrorNextLocalCompanyInCore(): void
+    {
+        DB::statement('set session information_schema_stats_expiry = 0');
+        $next = (int) DB::selectOne("select auto_increment as next_id from information_schema.tables where table_schema = database() and table_name = 'companies'")->next_id;
+
+        DB::connection('core')->table('companies')->insertOrIgnore(['id' => $next, 'name' => 'Specchio locale', 'created_at' => now(), 'updated_at' => now()]);
     }
 
     /** Una company del core (le chiavi esterne di tasks e documents ne vogliono una vera). */

@@ -16,9 +16,8 @@ use App\Services\Documents\LoggingSharePointUploader;
 use App\Services\Documents\NullDocumentReader;
 use App\Services\Documents\SharePointUploader;
 use App\Services\Flows\FlowRepository;
+use App\Services\Loans\CompanyLoanEstimator;
 use App\Services\Loans\LoanEstimator;
-use App\Services\Loans\MediafacileLoanEstimator;
-use App\Services\Loans\RandomLoanEstimator;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event;
@@ -49,10 +48,8 @@ class AppServiceProvider extends ServiceProvider
         // Archiviazione dei documenti su SharePoint: per ora una simulazione che scrive nel log.
         $this->app->bind(SharePointUploader::class, LoggingSharePointUploader::class);
 
-        // Calcolo degli importi ottenibili: simulazione di base, servizio Mediafacile con QUOTE_DRIVER=mediafacile.
-        $this->app->bind(LoanEstimator::class, fn ($app) => config('finanziamento.quote.driver') === 'mediafacile'
-            ? $app->make(MediafacileLoanEstimator::class)
-            : new RandomLoanEstimator);
+        // Calcolo degli importi ottenibili: servizio Mediafacile per le aziende che lo hanno configurato (Races) o con QUOTE_DRIVER=mediafacile, altrimenti simulazione di base.
+        $this->app->bind(LoanEstimator::class, CompanyLoanEstimator::class);
 
         // Lettura dei documenti con AI: attiva solo se c'è la chiave Anthropic.
         $this->app->bind(DocumentReader::class, function () {

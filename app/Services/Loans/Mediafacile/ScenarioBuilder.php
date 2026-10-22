@@ -2,6 +2,8 @@
 
 namespace App\Services\Loans\Mediafacile;
 
+use App\Models\Company;
+use App\Models\Fornitore;
 use App\Models\LoanRequest;
 use App\Models\QuoteBandBound;
 use App\Models\QuoteContractType;
@@ -10,11 +12,13 @@ use App\Models\QuoteEmploymentMap;
 use App\Models\QuoteEmploymentType;
 use App\Services\Loans\QuoteUnavailable;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 
 /**
- * Dalle risposte a fasce della richiesta ai parametri del servizio di simulazione, per due scenari:
- * `best` (giovane, molta anzianità, reddito alto) e `worst` (anziano, poca anzianità, reddito basso).
- * Non include la Passkey. Lancia QuoteUnavailable se la richiesta non si può simulare.
+ * Dalle risposte della richiesta ai parametri del servizio di simulazione, per due scenari:
+ * `best` (età minima della fascia, anzianità di servizio massima) e `worst` (età massima, anzianità minima).
+ * Il massimo e il minimo si prendono dalle due simulazioni.
+ * Per cessione e delega include `Provvigione` (i punti da caricare) se l'agente li ha indicati. Non include la Passkey. Lancia QuoteUnavailable se la richiesta non si può simulare.
  */
 class ScenarioBuilder
 {
@@ -31,43 +35,46 @@ class ScenarioBuilder
         $months = $this->duration($contract->value, $answers['durata'] ?? null);
         $now = now()->toImmutable();
 
+        $ids = $this->ids($loan);
+
         return [
-            'best' => $this->scenario($answers, $contract->value, $employment, $months, $now, best: true),
-            'worst' => $this->scenario($answers, $contract->value, $employment, $months, $now, best: false),
+            'best' => $ids + $this->scenario($answers, $contract->value, $employment, $months, $now, best: true),
+            'worst' => $ids + $this->scenario($answers, $contract->value, $employment, $months, $now, best: false),
         ];
+    }
+
+    /**
+     * ID_listino (dell'azienda) e ID_agente (del produttore, altrimenti dell'azienda): li vuole il servizio.
+     * Se non sono configurati si omettono e il servizio risponde con il campo mancante.
+     *
+     * @return array<string,string>
+     */
+    private function ids(LoanRequest $loan): array
+    {
+        $company = Company::forWhatsApp($loan->agent_wa_number);
+        $agent = filled($loan->agent_wa_number) ? Fornitore::findByWhatsApp($loan->agent_wa_number) : null;
+
+        return array_filter([
+            'ID_listino' => (string) $company?->quote_id_listino,
+            'ID_agente' => (string) ($agent?->codice ?: $company?->quote_id_agente),
+        ], fn (string $id) => $id !== '');
     }
 
     /** @return array<string,string> */
     private function scenario(array $answers, string $contract, string $employment, int $months, CarbonImmutable $now, bool $best): array
     {
-        $age = $this->bound('eta', $answers['eta'] ?? null, low: $best);
-        $birth = $now->setDate($now->year - $age, 1, 1)->startOfDay();
+        $birth = $this->birthFromBand($answers, $now, $best);
 
-        $seniorityCode = $answers['anzianita'] ?? $answers['anni_attivita'] ?? null;
-        $seniority = $seniorityCode !== null
-            ? $this->bound('anzianita', $seniorityCode, low: ! $best)
-            : (int) config('finanziamento.quote.default_seniority_years', 20);
-        $hired = max($now->setDate($now->year - $seniority, 1, 1)->startOfDay(), $birth->addYears(18));
-
-        $income = $this->bound('reddito', $answers[self::INCOME_NODES[$answers['lavoro'] ?? ''] ?? 'reddito'] ?? null, low: ! $best);
+        $hired = $this->hiredFromBand($answers, $birth, $now, $best);
+        $rata = $this->exactAmount($answers['importo_rata'] ?? null);
+        $income = $rata !== null ? $rata * 5 : $this->bound('reddito', $answers[self::INCOME_NODES[$answers['lavoro'] ?? ''] ?? 'reddito'] ?? null, low: ! $best);
 
         $common = [
             'Data_nascita' => $this->date($birth),
             'Data_assunzione' => $this->date($hired),
         ];
 
-        if ($contract === 'Prestito') {
-            return $common + [
-                'Sesso' => $this->sex($answers),
-                'Tipo_contratto' => $contract,
-                'Tipo_rapporto' => $employment,
-                'Durata' => (string) $months,
-                'Importo_richiesto' => $this->money($this->bound('importo', $answers['importo'] ?? null, low: ! $best)),
-                'Reddito_richiedenti' => $this->money($income),
-            ];
-        }
-
-        return $common + [
+        $params = $common + $this->points($answers) + [
             'Data_decorrenza' => $this->date($now->addMonthsNoOverflow(2)),
             'Sesso' => $this->sex($answers),
             'Tipo_contratto' => $contract,
@@ -76,11 +83,54 @@ class ScenarioBuilder
             'Importo_rata' => $this->money($income / 5),
             'Rinnovo' => 'NO',
         ];
+
+        // Il prestito vuole anche l'importo richiesto e il reddito (la rata è un quinto del reddito, in attesa della domanda dedicata).
+        if ($contract === 'Prestito') {
+            $params += [
+                'Importo_richiesto' => $this->money($this->bound('importo', $answers['importo'] ?? null, low: ! $best)),
+                'Reddito_richiedenti' => $this->money($income),
+            ];
+        }
+
+        return $params;
+    }
+
+    private function birthFromBand(array $answers, CarbonImmutable $now, bool $best): CarbonImmutable
+    {
+        $age = $this->bound('eta', $answers['eta'] ?? null, low: $best);
+
+        return $now->setDate($now->year - $age, 1, 1)->startOfDay();
+    }
+
+    private function hiredFromBand(array $answers, CarbonImmutable $birth, CarbonImmutable $now, bool $best): CarbonImmutable
+    {
+        $seniorityCode = $answers['anzianita'] ?? $answers['anni_attivita'] ?? null;
+        $seniority = $seniorityCode !== null
+            ? $this->bound('anzianita', $seniorityCode, low: ! $best)
+            : (int) config('finanziamento.quote.default_seniority_years', 20);
+
+        return max($now->setDate($now->year - $seniority, 1, 1)->startOfDay(), $birth->addYears(18));
+    }
+
+    /** Importo in euro scritto dall'agente («300» o «300,50»); null se manca o non è maggiore di zero. */
+    private function exactAmount(mixed $value): ?float
+    {
+        $amount = str_replace(',', '.', trim((string) $value));
+
+        return is_numeric($amount) && (float) $amount > 0 ? (float) $amount : null;
+    }
+
+    /** I punti da caricare (valore assoluto) scelti dall'agente; se non c'è la risposta la provvigione non si invia. */
+    private function points(array $answers): array
+    {
+        $points = str_replace(',', '.', trim((string) ($answers['punti'] ?? '')));
+
+        return is_numeric($points) && (float) $points > 0 ? ['Provvigione' => $this->money((float) $points)] : [];
     }
 
     private function employmentType(array $answers, string $contract): string
     {
-        $type = QuoteEmploymentMap::resolve($answers)?->tipo_rapporto
+        $type = $this->chosenType($answers) ?? QuoteEmploymentMap::resolve($answers)?->tipo_rapporto
             ?? throw new QuoteUnavailable('Situazione lavorativa non riconosciuta.');
 
         $allowed = QuoteEmploymentType::where('value', $type)->first()?->contracts;
@@ -89,6 +139,14 @@ class ScenarioBuilder
         }
 
         return $type;
+    }
+
+    /** Il tipo di rapporto scelto dall'agente (cessione), nella forma che vuole il servizio: «privato_spa» → «Privato SPA». */
+    private function chosenType(array $answers): ?string
+    {
+        $code = ($answers['tipo_rapporto'] ?? null) === 'altro' ? ($answers['tipo_rapporto_altro'] ?? null) : ($answers['tipo_rapporto'] ?? null);
+
+        return $code === null ? null : QuoteEmploymentType::all()->first(fn (QuoteEmploymentType $type) => Str::slug($type->value, '_') === $code)?->value;
     }
 
     private function duration(string $contract, ?string $code): int

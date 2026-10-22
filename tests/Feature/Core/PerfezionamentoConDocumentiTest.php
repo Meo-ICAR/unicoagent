@@ -33,7 +33,7 @@ class PerfezionamentoConDocumentiTest extends CoreTestCase
         config(['finanziamento.mail.to' => 'istruttoria@example.com', 'services.whatsapp.token' => 'T', 'services.whatsapp.phone_number_id' => '1']);
 
         // L'agente di GBD sta nel core con company_id = id locale della company: nel DB di test serve una company core con quell'id.
-        DB::connection('core')->table('companies')->insertOrIgnore(['id' => 1, 'name' => 'Specchio locale', 'created_at' => now(), 'updated_at' => now()]);
+        $this->mirrorNextLocalCompanyInCore();
         $this->seed(FlowSeeder::class);
         $this->seed(GbdEnergySeeder::class);
 

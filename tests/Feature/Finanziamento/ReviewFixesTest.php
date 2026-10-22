@@ -40,7 +40,7 @@ class ReviewFixesTest extends ConversationTestCase
         $company = Company::create(['name' => 'Titolare']);
         Flow::query()->update(['company_id' => $company->id]);
         Fornitore::create(['name' => 'Agente', 'tel' => $this->agent, 'is_active' => true, 'company_id' => $company->id]);
-        $this->say(...['#menu_richiedi', '#personale', '#imp_5k', '#m24', '#eta_40', '#sesso_m', '#dip_priv', '#det', '#anz_1', '#red_1500', '#no', '#no', '#conferma']);
+        $this->say(...['#menu_richiedi', '#personale', '#imp_5k', '#m24', '#eta_40', '#sesso_m', '#dip_priv', '#det', '#anz_1', '#red_1500', '#no', '#no', '3', '#conferma']);
         $code = LoanRequest::latest('id')->value('code');
         Conversation::query()->delete();
 

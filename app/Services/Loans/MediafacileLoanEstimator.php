@@ -8,6 +8,7 @@ use App\Models\QuoteContractType;
 use App\Models\QuoteSimulation;
 use App\Services\Loans\Mediafacile\MediafacileClient;
 use App\Services\Loans\Mediafacile\ScenarioBuilder;
+use Unico\Core\Clients\MediafacileSimulationService;
 
 /**
  * Importo erogato minimo e massimo dal servizio di simulazione Mediafacile: due chiamate,
@@ -30,23 +31,27 @@ class MediafacileLoanEstimator implements LoanEstimator
             throw new QuoteUnavailable('Preventivatore non configurato.');
         }
 
-        $erogato = [];
+        // Due simulazioni (migliore e peggiore): massimo, minimo e media si prendono da tutte le offerte valide di entrambe.
+        $allOffers = [];
         foreach ($this->scenarios->build($loan) as $name => $params) {
             $raw = $this->client->request($company->url_preventivatore, $company->preventivatore_passkey, $params);
-            $offers = MediafacileClient::parse($raw);
-            $valid = collect($offers)->where('valid', true)->pluck('erogato');
+            $offers = MediafacileClient::offers($raw);
+            $valid = collect($offers)->where('valid', true);
 
             QuoteSimulation::create([
                 'loan_request_id' => $loan->id, 'scenario' => $name, 'request' => $params, 'response' => $raw,
-                'offers_count' => count($offers), 'erogato_min' => $valid->min(), 'erogato_max' => $valid->max(),
+                'offers_count' => count($offers), 'erogato_min' => $valid->min('erogato'), 'erogato_max' => $valid->max('erogato'),
             ]);
 
             if ($valid->isEmpty()) {
                 throw new QuoteUnavailable("Nessuna offerta valida nello scenario {$name}.");
             }
-            $erogato[$name] = $name === 'best' ? $valid->max() : $valid->min();
+            $allOffers = [...$allOffers, ...$offers];
         }
 
-        return ['min' => (int) round(min($erogato)), 'max' => (int) round(max($erogato))];
+        $details = MediafacileSimulationService::summary($allOffers)
+            ?? throw new QuoteUnavailable('Nessuna offerta valida.');
+
+        return ['min' => (int) round($details['min']['amount']), 'max' => (int) round($details['max']['amount']), 'details' => $details];
     }
 }

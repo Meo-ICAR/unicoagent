@@ -6,14 +6,14 @@ use App\Mail\QuoteMail;
 use App\Models\Company;
 use App\Models\Fornitore;
 use App\Models\LoanRequest;
+use App\Services\Loans\CompanyLoanEstimator;
 use App\Services\Loans\LoanEstimator;
-use App\Services\Loans\MediafacileLoanEstimator;
 use App\Services\Loans\QuoteUnavailable;
 use Illuminate\Support\Facades\Mail;
 
 class QuoteFallbackTest extends ConversationTestCase
 {
-    private const FLOW = ['#menu_richiedi', '#personale', '#imp_5k', '#m24', '#eta_40', '#sesso_m', '#dip_priv', '#det', '#anz_1', '#red_1500', '#no', '#no', '#conferma'];
+    private const FLOW = ['#menu_richiedi', '#personale', '#imp_5k', '#m24', '#eta_40', '#sesso_m', '#dip_priv', '#det', '#anz_1', '#red_1500', '#no', '#no', '3', '#conferma'];
 
     public function test_se_la_stima_non_e_disponibile_la_richiesta_parte_per_email(): void
     {
@@ -35,10 +35,8 @@ class QuoteFallbackTest extends ConversationTestCase
         Mail::assertSent(QuoteMail::class);
     }
 
-    public function test_con_driver_mediafacile_il_vero_stimatore_e_collegato(): void
+    public function test_lo_stimatore_collegato_sceglie_il_servizio_per_azienda(): void
     {
-        config(['finanziamento.quote.driver' => 'mediafacile']);
-
-        $this->assertInstanceOf(MediafacileLoanEstimator::class, app(LoanEstimator::class));
+        $this->assertInstanceOf(CompanyLoanEstimator::class, app(LoanEstimator::class));
     }
 }

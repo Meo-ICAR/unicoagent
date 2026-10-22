@@ -14,17 +14,42 @@ class FasceChiuseTest extends ConversationTestCase
         $this->assertSame('35.000 - 50.000 €', $options['imp_oltre']);
     }
 
-    public function test_dopo_la_durata_si_chiedono_eta_e_sesso_per_quinto_e_personale(): void
+    public function test_dopo_la_durata_si_chiedono_eta_e_sesso_e_per_il_quinto_il_tipo_di_rapporto(): void
     {
-        $replies = $this->say('#menu_richiedi', '#quinto', '#imp_20k', '#m60');
+        $replies = $this->say('#menu_richiedi', '#personale', '#imp_5k', '#m24');
         $this->assertSame(['eta_30', 'eta_40', 'eta_50', 'eta_60', 'eta_75'], array_keys(end($replies)->options));
 
         $replies = $this->say('#eta_40');
         $this->assertSame(['sesso_m', 'sesso_f'], array_keys(end($replies)->options));
 
-        $replies = $this->say('#sesso_f');
-        $this->assertArrayHasKey('dip_priv', end($replies)->options, 'poi la situazione lavorativa');
+        Conversation::query()->delete();
+        $replies = $this->say('#menu_richiedi', '#quinto', '#m60');
+        $this->assertSame(['eta_30', 'eta_40', 'eta_50', 'eta_60', 'eta_75'], array_keys(end($replies)->options));
+
+        $replies = $this->say('#eta_40', '#sesso_f');
+        $this->assertArrayHasKey('pubblico', end($replies)->options, 'poi il tipo di rapporto, non lavoro e contratto');
+        $this->assertArrayNotHasKey('dip_priv', end($replies)->options);
         $this->assertSame('sesso_f', Conversation::first()->data['sesso']);
+    }
+
+    public function test_il_quinto_chiede_l_anzianita_ma_non_ai_pensionati_e_poi_rata_e_punti(): void
+    {
+        $replies = $this->say('#menu_richiedi', '#quinto', '#m60', '#eta_40', '#sesso_m', '#privato_spa');
+        $this->assertArrayHasKey('anz_10', end($replies)->options);
+
+        $replies = $this->say('#anz_10');
+        $this->assertStringContainsString('rata mensile', $this->bodies($replies));
+        $replies = $this->say('300');
+        $this->assertStringContainsString('punti', $this->bodies($replies));
+        $this->assertSame('punti', Conversation::first()->node);
+
+        Conversation::query()->delete();
+        $replies = $this->say('#menu_richiedi', '#quinto', '#m60', '#eta_75', '#sesso_m', '#pensionato_inps');
+        $this->assertStringContainsString('rata mensile', $this->bodies($replies), 'il pensionato salta l\'anzianità');
+
+        Conversation::query()->delete();
+        $replies = $this->say('#menu_richiedi', '#quinto', '#m60', '#eta_40', '#sesso_m', '#altro');
+        $this->assertSame(['medico', 'postale', 'ferroviere'], array_keys(end($replies)->options));
     }
 
     public function test_il_sesso_si_puo_saltare(): void

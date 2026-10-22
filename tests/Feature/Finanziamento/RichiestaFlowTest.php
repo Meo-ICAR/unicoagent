@@ -31,14 +31,17 @@ class RichiestaFlowTest extends ConversationTestCase
 
     public function test_cessione_del_quinto_completa_fino_al_codice(): void
     {
-        $this->say('#menu_richiedi', '#quinto', '#imp_20k', '#m60', '#eta_40', '#sesso_m', '#dip_pub', '#indet', '#anz_10', '#red_2000', '#oltre15', '#no', '#no', '#no');
+        $this->say('#menu_richiedi', '#quinto', '#m60', '#eta_40', '#sesso_m', '#pubblico', '#anz_10', '300', '2,5');
 
         $replies = $this->say('#conferma');
 
         $loan = LoanRequest::firstOrFail();
         $this->assertSame('quinto', $loan->product);
         $this->assertSame('richiesta', $loan->status);
-        $this->assertSame('red_2000', $loan->answers['reddito']);
+        $this->assertSame('eta_40', $loan->answers['eta']);
+        $this->assertSame('anz_10', $loan->answers['anzianita']);
+        $this->assertSame('300', $loan->answers['importo_rata']);
+        $this->assertSame('2,5', $loan->answers['punti']);
         $this->assertSame($this->agent, $loan->agent_wa_number);
         $this->assertMatchesRegularExpression('/^SEG-\d{4}-\d{4}$/', $loan->code);
         $this->assertStringContainsString($loan->code, $this->bodies($replies));
@@ -47,11 +50,14 @@ class RichiestaFlowTest extends ConversationTestCase
 
     public function test_il_riepilogo_elenca_le_risposte_in_chiaro(): void
     {
-        $replies = $this->say('#menu_richiedi', '#quinto', '#imp_20k', '#m60', '#eta_40', '#sesso_m', '#dip_pub', '#indet', '#anz_10', '#red_2000', '#oltre15', '#no', '#no', '#no');
+        $replies = $this->say('#menu_richiedi', '#quinto', '#m60', '#eta_40', '#sesso_m', '#pubblico', '#anz_10', '300', '2,5');
 
         $this->assertCount(2, $replies);
-        $this->assertStringContainsString('Importo: 10.000 - 20.000 €', $replies[0]->body);
-        $this->assertStringContainsString('Situazione lavorativa: Dipendente pubblico', $replies[0]->body);
+        $this->assertStringContainsString('Fascia d\'età: 30 - 40 anni', $replies[0]->body);
+        $this->assertStringContainsString('Anzianità lavorativa: 3 - 10 anni', $replies[0]->body);
+        $this->assertStringContainsString('Rata da simulare: 300', $replies[0]->body);
+        $this->assertStringContainsString('Tipo di rapporto: Pubblico', $replies[0]->body);
+        $this->assertStringContainsString('Punti da caricare: 2,5', $replies[0]->body);
         $this->assertSame(['conferma', 'modifica', 'annulla'], array_keys($replies[1]->options));
     }
 

@@ -1042,6 +1042,25 @@ class ConversationEngine
         return array_filter($data, fn ($key) => ! str_starts_with((string) $key, '_'), ARRAY_FILTER_USE_KEY);
     }
 
+    /**
+     * Realizzo medio ponderato, massimo e minimo con la banca (le offerte in errore sono già scartate).
+     *
+     * @param  array{average: float, max: array{amount: float, bank: ?string}, min: array{amount: float, bank: ?string}}|null  $details
+     */
+    private function quoteDetails(?array $details): string
+    {
+        if ($details === null) {
+            return '';
+        }
+
+        $money = fn (float $amount): string => number_format($amount, 0, ',', '.').' €';
+        $bank = fn (?string $name): string => $name ?: 'banca non indicata';
+
+        return "\n📊 Realizzo medio ponderato: *{$money($details['average'])}*"
+            ."\n⬆️ Massimo: *{$money($details['max']['amount'])}* — {$bank($details['max']['bank'])}"
+            ."\n⬇️ Minimo: *{$money($details['min']['amount'])}* — {$bank($details['min']['bank'])}";
+    }
+
     /** Importi ottenibili per i produttori; chi non lo è (segnalatore occasionale) è invitato a chiamare la company. */
     private function outcomeText(LoanRequest $loan, string $waNumber): string
     {
@@ -1065,7 +1084,8 @@ class ConversationEngine
                 return $this->forwardQuote($loan);
             }
 
-            return '💶 Importo ottenibile: da *'.number_format($range['min'], 0, ',', '.').' €* a *'.number_format($range['max'], 0, ',', '.').' €*.';
+            return '💶 Importo ottenibile: da *'.number_format($range['min'], 0, ',', '.').' €* a *'.number_format($range['max'], 0, ',', '.').' €*.'
+                .$this->quoteDetails($range['details'] ?? null);
         }
 
         Fornitore::registerOccasional($waNumber);

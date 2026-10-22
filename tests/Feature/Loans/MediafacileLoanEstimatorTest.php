@@ -46,16 +46,30 @@ class MediafacileLoanEstimatorTest extends TestCase
 
         $range = app(MediafacileLoanEstimator::class)->estimate($this->loan());
 
-        $this->assertSame(['min' => 8001, 'max' => 15000], $range);
-        Http::assertSent(function (Request $r) {
-            parse_str((string) parse_url($r->url(), PHP_URL_QUERY), $q);
-
-            return ($q['Passkey'] ?? null) === 'KEY' && ($q['Data_nascita'] ?? null) === '01-01-1986' && ($q['Importo_rata'] ?? null) === '400,00';
-        });
+        $this->assertSame(['min' => 8001, 'max' => 15000], ['min' => $range['min'], 'max' => $range['max']]);
+        Http::assertSent(fn (Request $r) => $r->isForm()
+            && ($r['passkey'] ?? null) === 'KEY' && ($r['Data_nascita'] ?? null) === '01-01-1986' && ($r['Importo_rata'] ?? null) === '400,00');
         $this->assertSame(['best', 'worst'], QuoteSimulation::orderBy('id')->pluck('scenario')->all());
         $this->assertSame(3, QuoteSimulation::where('scenario', 'best')->value('offers_count'));
         $this->assertEquals(14000, QuoteSimulation::where('scenario', 'best')->value('erogato_min'));
         $this->assertArrayNotHasKey('Passkey', QuoteSimulation::first()->request);
+    }
+
+    public function test_il_dettaglio_ha_media_ponderata_massimo_e_minimo_con_banca_senza_gli_errori(): void
+    {
+        $this->company();
+        $offer = fn (string $bank, string $erogato, string $provv, int $err) => "<Offerta><Istituto><Nome>{$bank}</Nome></Istituto><Importo_erogato>{$erogato}</Importo_erogato><Importo_provvigione>{$provv}</Importo_provvigione><Errore>{$err}</Errore></Offerta>";
+        Http::fake(['crm.example.com/*' => Http::sequence()
+            ->push('<Offerte>'.$offer('Banca A', '15000,00', '300,00', 2).$offer('Banca X', '99999,00', '900,00', 1).'</Offerte>')
+            ->push('<Offerte>'.$offer('Banca B', '9000,00', '100,00', 2).'</Offerte>')]);
+
+        $details = app(MediafacileLoanEstimator::class)->estimate($this->loan())['details'];
+
+        $this->assertSame(2, $details['count']);
+        $this->assertTrue($details['weighted']);
+        $this->assertSame(13500.0, $details['average']);
+        $this->assertSame(['amount' => 15000.0, 'bank' => 'Banca A'], $details['max']);
+        $this->assertSame(['amount' => 9000.0, 'bank' => 'Banca B'], $details['min']);
     }
 
     public function test_se_il_peggiore_supera_il_migliore_l_intervallo_si_ordina(): void
@@ -63,7 +77,8 @@ class MediafacileLoanEstimatorTest extends TestCase
         $this->company();
         Http::fake(['crm.example.com/*' => Http::sequence()->push($this->xml([['5000,00', 2]]))->push($this->xml([['7000,00', 2]]))]);
 
-        $this->assertSame(['min' => 5000, 'max' => 7000], app(MediafacileLoanEstimator::class)->estimate($this->loan()));
+        $range = app(MediafacileLoanEstimator::class)->estimate($this->loan());
+        $this->assertSame(['min' => 5000, 'max' => 7000], ['min' => $range['min'], 'max' => $range['max']]);
     }
 
     public function test_senza_offerte_valide_in_uno_scenario_non_c_e_stima_ma_resta_la_traccia(): void

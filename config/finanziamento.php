@@ -2,8 +2,8 @@
 
 use App\Services\Checks\CodiceFiscaleCheck;
 use App\Services\Checks\DatiCoerentiCheck;
-use App\Services\Checks\EstraiDatiCheck;
 use App\Services\Checks\EmailCheck;
+use App\Services\Checks\EstraiDatiCheck;
 use App\Services\Checks\FornitoreEnergiaCheck;
 use App\Services\Checks\IbanCheck;
 use App\Services\Checks\InformativaFirmataCheck;
@@ -136,7 +136,7 @@ return [
                     'personale' => 'Prestito personale', 'quinto' => 'Cessione del quinto', 'finalizzato' => 'Finalizzato (beni)',
                     'mutuo' => 'Mutuo', 'leasing' => 'Leasing', 'aziendale' => 'Finanziamento aziendale',
                 ], [
-                    'personale' => 'importo', 'quinto' => 'importo', 'finalizzato' => 'importo',
+                    'personale' => 'importo', 'quinto' => 'durata', 'finalizzato' => 'importo',
                     'mutuo' => 'mutuo_scopo', 'leasing' => 'leasing_bene', 'aziendale' => 'az_forma',
                 ]),
 
@@ -144,7 +144,17 @@ return [
                 'importo' => $choice('Importo', 'Quale importo ti serve?', $importiPrestito, 'durata', ['can_modify' => true]),
                 'durata' => $choice('Durata', 'Su quale durata?', $durate, ['personale' => 'eta', 'quinto' => 'eta', 'finalizzato' => 'lavoro', 'leasing' => 'leasing_anticipo', 'aziendale' => 'az_finalita'], ['next_by' => 'prodotto', 'can_modify' => true]),
                 'eta' => $choice('Fascia d\'età', 'Qual è l\'età del cliente?', $eta, 'sesso'),
-                'sesso' => $choice('Sesso', 'Qual è il sesso del cliente? Se salti, considero maschio.', ['sesso_m' => 'Maschio', 'sesso_f' => 'Femmina'], 'lavoro', ['skippable' => true]),
+                'sesso' => $choice('Sesso', 'Qual è il sesso del cliente? Se salti, considero maschio.', ['sesso_m' => 'Maschio', 'sesso_f' => 'Femmina'], ['quinto' => 'tipo_rapporto', '*' => 'lavoro'], ['skippable' => true, 'next_by' => 'prodotto']),
+                // Cessione del quinto: il simulatore vuole solo il tipo di rapporto (non lavoro, contratto e dimensione dell'azienda).
+                'tipo_rapporto' => $choice('Tipo di rapporto', 'Qual è il tipo di rapporto di lavoro del cliente?', [
+                    'statale' => 'Statale', 'pubblico' => 'Pubblico', 'parapubblico' => 'Parapubblico', 'privato_spa' => 'Privato SPA',
+                    'privato_altra_forma' => 'Privato Altra forma', 'privato_small_business' => 'Privato Small Business',
+                    'pensionato_inps' => 'Pensionato INPS', 'pensionato_inpdap' => 'Pensionato INPDAP', 'pensionato_altri_enti' => 'Pensionato altri enti', 'altro' => 'Altro',
+                ], [
+                    'pensionato_inps' => 'importo_rata', 'pensionato_inpdap' => 'importo_rata', 'pensionato_altri_enti' => 'importo_rata',
+                    'altro' => 'tipo_rapporto_altro', '*' => 'anzianita',
+                ]),
+                'tipo_rapporto_altro' => $choice('Altro rapporto', 'Quale tra questi?', ['medico' => 'Medico', 'postale' => 'Postale', 'ferroviere' => 'Ferroviere'], 'anzianita'),
 
                 // Credito al consumo
                 'lavoro' => $choice('Situazione lavorativa', 'Qual è la situazione lavorativa del cliente?', [
@@ -152,7 +162,10 @@ return [
                     'autonomo' => 'Autonomo', 'altro' => 'Altro',
                 ], ['dip_priv' => 'contratto', 'dip_pub' => 'contratto', 'pensionato' => 'ente_pensione', 'autonomo' => 'anni_attivita', '*' => 'impegni']),
                 'contratto' => $choice('Contratto', 'Che tipo di contratto ha?', ['indet' => 'Tempo indeterminato', 'det' => 'Tempo determinato'], 'anzianita'),
-                'anzianita' => $choice('Anzianità lavorativa', 'Da quanto lavora presso l\'attuale datore?', $anzianitaConsumo, 'reddito'),
+                'anzianita' => $choice('Anzianità lavorativa', 'Da quanto lavora presso l\'attuale datore?', $anzianitaConsumo, ['quinto' => 'importo_rata', '*' => 'reddito'], ['next_by' => 'prodotto']),
+                'importo_rata' => $text('Rata da simulare', 'Quale rata mensile vuoi simulare? Indica l\'importo in euro, ad esempio 300 o 300,50.', ['required', 'regex:/^\d{2,4}([.,]\d{1,2})?$/'], 'punti', [
+                    'strip_spaces' => true, 'error' => 'Indica la rata in euro come numero, ad esempio 300 o 300,50.',
+                ]),
                 'reddito' => $choice('Reddito netto mensile', 'Qual è il reddito netto mensile?', $redditiConsumo, ['quinto' => 'dimensione_azienda', '*' => 'impegni'], ['next_by' => 'prodotto']),
                 'dimensione_azienda' => $choice('Dimensione azienda', 'Quanti dipendenti ha l\'azienda?', ['oltre15' => 'Oltre 15 dipendenti', 'fino15' => 'Fino a 15 dipendenti'], 'impegni'),
                 'ente_pensione' => $choice('Ente pensionistico', 'Da quale ente riceve la pensione?', ['inps' => 'INPS', 'exinpdap' => 'Ex INPDAP', 'altro' => 'Altro ente'], 'pensione_netta'),
@@ -161,8 +174,11 @@ return [
                 'reddito_autonomo' => $choice('Reddito', 'Qual è il reddito dell\'ultima dichiarazione (mensile netto)?', $redditiConsumo, 'impegni'),
                 'impegni' => $choice('Finanziamenti in corso', 'Ci sono finanziamenti in corso?', $yn, ['si' => 'rata', 'no' => 'crif']),
                 'rata' => $choice('Rata mensile', 'A quanto ammonta la rata mensile totale?', ['rata_200' => 'Fino a 200 €', 'rata_400' => '200 - 400 €', 'rata_oltre' => 'Oltre 400 €'], 'crif'),
-                'crif' => $choice('Segnalazioni CRIF', 'Ci sono segnalazioni in CRIF o protesti?', ['no' => 'No', 'si' => 'Sì', 'nonso' => 'Non so'], ['quinto' => 'quote_cedute', 'finalizzato' => 'bene', '*' => 'riepilogo'], ['next_by' => 'prodotto']),
-                'quote_cedute' => $choice('Quote già cedute', 'Ci sono quote dello stipendio già cedute?', $yn, 'riepilogo'),
+                'crif' => $choice('Segnalazioni CRIF', 'Ci sono segnalazioni in CRIF o protesti?', ['no' => 'No', 'si' => 'Sì', 'nonso' => 'Non so'], ['quinto' => 'quote_cedute', 'personale' => 'punti', 'finalizzato' => 'bene', '*' => 'riepilogo'], ['next_by' => 'prodotto']),
+                'quote_cedute' => $choice('Quote già cedute', 'Ci sono quote dello stipendio già cedute?', $yn, 'punti'),
+                'punti' => $text('Punti da caricare', 'Quanti punti vuoi caricare? Indica il valore assoluto, ad esempio 3 o 2,5.', ['required', 'regex:/^(?!0+([.,]0+)?$)\d{1,2}([.,]\d{1,2})?$/'], 'riepilogo', [
+                    'strip_spaces' => true, 'error' => 'Indica i punti come numero maggiore di zero, ad esempio 3 o 2,5.',
+                ]),
                 'bene' => $choice('Bene', 'Quale bene si vuole acquistare?', ['auto_nuova' => 'Auto nuova', 'auto_usata' => 'Auto usata', 'moto' => 'Moto', 'altro' => 'Altro bene'], 'prezzo_bene'),
                 'prezzo_bene' => $choice('Prezzo del bene', 'Qual è il prezzo del bene?', $importi, 'anticipo'),
                 'anticipo' => $choice('Anticipo', 'È previsto un anticipo?', $yn, 'riepilogo'),

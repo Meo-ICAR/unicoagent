@@ -26,7 +26,7 @@ final class LeadParameters
             'cognome' => $personal['cognome'] ?? null,
             'nome' => $personal['nome'] ?? null,
             'data_nascita' => self::birthDate($personal['data_nascita'] ?? null),
-            'tipologia' => QuoteEmploymentMap::resolve($answers)?->lead_tipologia,
+            'tipologia' => self::tipologiaScelta($answers) ?? QuoteEmploymentMap::resolve($answers)?->lead_tipologia,
             'importo_richiesto' => $band ? number_format($band->high, 2, ',', '') : null,
             'residenza_citta' => $residence['city'],
             'residenza_provincia' => $residence['province'],
@@ -37,6 +37,28 @@ final class LeadParameters
             'codice_fiscale' => $personal['codice_fiscale'] ?? null,
             'codice_fiscale_agente' => Fornitore::findByWhatsApp((string) $loan->agent_wa_number)?->cf,
         ], fn ($value) => $value !== null && $value !== '');
+    }
+
+    /** Il tipo di rapporto scelto per la cessione, come lo vuole la tabella 3.1 del servizio lead («Privato SPA» → «Privato»). */
+    private static function tipologiaScelta(array $answers): ?string
+    {
+        $code = ($answers['tipo_rapporto'] ?? null) === 'altro' ? ($answers['tipo_rapporto_altro'] ?? null) : ($answers['tipo_rapporto'] ?? null);
+
+        return match ($code) {
+            null => null,
+            'privato_spa' => 'Privato',
+            'pensionato_inpdap' => 'Pensionato altri enti',
+            default => self::lead($code),
+        };
+    }
+
+    private static function lead(string $code): string
+    {
+        return [
+            'statale' => 'Statale', 'pubblico' => 'Pubblico', 'parapubblico' => 'Parapubblico', 'privato_altra_forma' => 'Privato altra forma',
+            'privato_small_business' => 'Privato small business', 'pensionato_inps' => 'Pensionato INPS', 'pensionato_altri_enti' => 'Pensionato altri enti',
+            'medico' => 'Medico', 'postale' => 'Postale', 'ferroviere' => 'Ferroviere',
+        ][$code] ?? ucfirst(str_replace('_', ' ', $code));
     }
 
     /** «gg/mm/aaaa» → «mm-gg-aaaa»; null se non è una data valida. */

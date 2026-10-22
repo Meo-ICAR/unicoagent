@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Loans;
 
+use App\Models\Company;
+use App\Models\Fornitore;
 use App\Models\LoanRequest;
 use App\Models\QuoteDuration;
 use App\Services\Loans\Mediafacile\ScenarioBuilder;
@@ -53,7 +55,71 @@ class ScenarioBuilderTest extends TestCase
         $this->assertSame('300,00', $s['worst']['Importo_rata']);
     }
 
-    public function test_prestito_usa_importo_e_reddito_senza_decorrenza_e_il_sesso_di_ripiego(): void
+    public function test_i_punti_da_caricare_vanno_come_provvigione_solo_se_indicati_e_non_per_il_prestito(): void
+    {
+        $con = (new ScenarioBuilder)->build($this->quinto(['punti' => '2,5']));
+        $senza = (new ScenarioBuilder)->build($this->quinto());
+
+        $this->assertSame('2,50', $con['best']['Provvigione']);
+        $this->assertSame('2,50', $con['worst']['Provvigione']);
+        $this->assertArrayNotHasKey('Provvigione', $senza['best']);
+
+        $prestito = (new ScenarioBuilder)->build($this->loan([
+            'prodotto' => 'personale', 'importo' => 'imp_10k', 'durata' => 'm36', 'eta' => 'eta_40',
+            'lavoro' => 'dip_priv', 'contratto' => 'det', 'anzianita' => 'anz_3', 'reddito' => 'red_3000', 'punti' => '3',
+        ]));
+        $this->assertSame('3,00', $prestito['best']['Provvigione'], 'anche il prestito li chiede');
+
+        $zero = (new ScenarioBuilder)->build($this->quinto(['punti' => '0']));
+        $this->assertArrayNotHasKey('Provvigione', $zero['best'], 'il servizio rifiuta zero');
+    }
+
+    public function test_ids_provvigione_e_rata_sono_nei_parametri_di_entrambi_gli_scenari(): void
+    {
+        Company::create(['name' => 'Races', 'quote_id_listino' => '0001', 'quote_id_agente' => '0002']);
+        $loan = $this->quinto(['importo_rata' => '300,50', 'punti' => '3', 'sesso' => 'sesso_m', 'tipo_rapporto' => 'pubblico']);
+        $loan->agent_wa_number = '393331112222';
+
+        $s = (new ScenarioBuilder)->build($loan);
+
+        $this->assertSame(['best', 'worst'], array_keys($s));
+        foreach ($s as $params) {
+            $this->assertSame('0001', $params['ID_listino']);
+            $this->assertSame('0002', $params['ID_agente']);
+            $this->assertSame('3,00', $params['Provvigione']);
+            $this->assertSame('300,50', $params['Importo_rata']);
+            $this->assertSame('Pubblico', $params['Tipo_rapporto']);
+        }
+        // Migliore: età minima della fascia e anzianità massima; peggiore: età massima e anzianità minima.
+        $this->assertSame(['01-01-1986', '01-01-2016'], [$s['best']['Data_nascita'], $s['best']['Data_assunzione']]);
+        $this->assertSame(['01-01-1976', '01-01-2023'], [$s['worst']['Data_nascita'], $s['worst']['Data_assunzione']]);
+    }
+
+    public function test_l_id_agente_del_produttore_vale_piu_di_quello_dell_azienda(): void
+    {
+        Company::create(['name' => 'Races', 'quote_id_listino' => '0001', 'quote_id_agente' => '0002']);
+        Fornitore::create(['name' => 'Agente', 'tel' => '393331112222', 'is_active' => true, 'codice' => '0123']);
+        $loan = $this->quinto(['importo_rata' => '300']);
+        $loan->agent_wa_number = '393331112222';
+
+        $this->assertSame('0123', (new ScenarioBuilder)->build($loan)['best']['ID_agente']);
+    }
+
+    public function test_il_tipo_di_rapporto_scelto_vale_piu_di_lavoro_e_contratto(): void
+    {
+        $base = ['prodotto' => 'quinto', 'durata' => 'm60', 'eta' => 'eta_50', 'importo_rata' => '300', 'anzianita' => 'anz_10'];
+
+        $privato = (new ScenarioBuilder)->build($this->loan($base + ['tipo_rapporto' => 'privato_small_business']));
+        $altro = (new ScenarioBuilder)->build($this->loan($base + ['tipo_rapporto' => 'altro', 'tipo_rapporto_altro' => 'ferroviere']));
+        $pensionato = (new ScenarioBuilder)->build($this->loan(['prodotto' => 'quinto', 'durata' => 'm60', 'eta' => 'eta_75', 'importo_rata' => '300', 'tipo_rapporto' => 'pensionato_inpdap']));
+
+        $this->assertSame('Privato Small Business', $privato['best']['Tipo_rapporto']);
+        $this->assertSame('Ferroviere', $altro['best']['Tipo_rapporto']);
+        $this->assertSame('Pensionato INPDAP', $pensionato['best']['Tipo_rapporto']);
+        $this->assertSame('01-01-2006', $pensionato['best']['Data_assunzione'], 'senza anzianità: ripiego di 20 anni');
+    }
+
+    public function test_prestito_usa_importo_e_reddito_e_il_sesso_di_ripiego(): void
     {
         $s = (new ScenarioBuilder)->build($this->loan([
             'prodotto' => 'personale', 'importo' => 'imp_10k', 'durata' => 'm36', 'eta' => 'eta_40',
@@ -68,8 +134,9 @@ class ScenarioBuilderTest extends TestCase
         $this->assertSame('3000,00', $s['best']['Reddito_richiedenti']);
         $this->assertSame('5000,00', $s['worst']['Importo_richiesto']);
         $this->assertSame('2000,00', $s['worst']['Reddito_richiedenti']);
-        $this->assertArrayNotHasKey('Data_decorrenza', $s['best']);
-        $this->assertArrayNotHasKey('Importo_rata', $s['best']);
+        $this->assertSame('600,00', $s['best']['Importo_rata'], 'in attesa della domanda dedicata: un quinto del reddito');
+        $this->assertSame('NO', $s['best']['Rinnovo']);
+        $this->assertArrayHasKey('Data_decorrenza', $s['best']);
     }
 
     public function test_il_rapporto_dipende_dalla_dimensione_dell_azienda(): void

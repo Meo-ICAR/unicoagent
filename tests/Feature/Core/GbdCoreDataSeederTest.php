@@ -4,7 +4,6 @@ namespace Tests\Feature\Core;
 
 use App\Models\Company;
 use Database\Seeders\GbdEnergySeeder;
-use Illuminate\Support\Facades\DB;
 use Unico\Core\Models\DocumentRequirement;
 use Unico\Core\Models\DocumentType;
 use Unico\Core\Models\PraticaStato;
@@ -20,7 +19,7 @@ class GbdCoreDataSeederTest extends CoreTestCase
     {
         parent::setUp();
         // L'agente sta nel core con company_id = id locale: serve una company core con quell'id; e la company GBD del core.
-        DB::connection('core')->table('companies')->insertOrIgnore(['id' => 1, 'name' => 'Specchio locale', 'created_at' => now(), 'updated_at' => now()]);
+        $this->mirrorNextLocalCompanyInCore();
         $this->coreId = \Unico\Core\Models\Company::create(['name' => 'GBD Energy'])->id;
         $this->privacyTypeId = DocumentType::create(['name' => 'NUOVA Infomativa privacy 2025 - Editato '.uniqid(), 'code' => 'PRIV'.uniqid()])->id;
     }

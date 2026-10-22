@@ -65,6 +65,10 @@ class CompanyForm
                         ->helperText('Se vuoto, i dati del preventivo vengono mandati per email all\'istruttoria.'),
                     TextInput::make('preventivatore_passkey')->label('Passkey del preventivatore')->password()->revealable()->maxLength(255)
                         ->helperText('Fornita con il servizio di simulazione; serve solo se il preventivatore è quello Mediafacile.'),
+                    TextInput::make('quote_id_listino')->label('ID listino (simulazione)')->maxLength(20)
+                        ->helperText('Lo chiede il servizio di simulazione Mediafacile in ogni richiesta (es. 0001).'),
+                    TextInput::make('quote_id_agente')->label('ID agente di default (simulazione)')->maxLength(20)
+                        ->helperText('Vale per i produttori che non hanno un proprio codice agente (es. 0001).'),
                     TextInput::make('url_istruttoria')->label('URL dell\'istruttoria (CRM)')->url()->maxLength(255)
                         ->helperText('Se vuoto, la pratica con gli allegati viene mandata per email all\'istruttoria.'),
                     TextInput::make('istruttoria_passkey')->label('Passkey dell\'istruttoria (CRM)')->password()->revealable()->maxLength(255)

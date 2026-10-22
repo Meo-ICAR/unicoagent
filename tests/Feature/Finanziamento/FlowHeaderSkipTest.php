@@ -118,7 +118,7 @@ class FlowHeaderSkipTest extends ConversationTestCase
 
         $this->say('salta');
 
-        $this->assertSame('riepilogo', Conversation::first()->node);
+        $this->assertSame('punti', Conversation::first()->node);
         $this->assertArrayNotHasKey('crif', Conversation::first()->data);
     }
 

@@ -78,7 +78,7 @@ return new class extends Migration
             'sort_order' => $order, 'skippable' => $node['skippable'] ?? false, 'save' => true, 'jump_by' => 'answer',
             'created_at' => now(), 'updated_at' => now(),
         ]);
-        DB::table('flow_node_jumps')->insert(['flow_node_id' => $id, 'when_value' => '*', 'go_to' => $node['next'], 'sort_order' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('flow_node_jumps')->insert(['flow_node_id' => $id, 'when_value' => '*', 'go_to' => is_array($node['next']) ? ($node['next']['*'] ?? reset($node['next'])) : $node['next'], 'sort_order' => 1, 'created_at' => now(), 'updated_at' => now()]);
         $this->insertOptions($id, $node['options']);
     }
 

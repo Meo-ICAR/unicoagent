@@ -5,8 +5,10 @@ namespace Tests\Feature\Core;
 use App\Filament\Resources\LoanRequests\Pages\ViewLoanRequest;
 use App\Filament\Resources\LoanRequests\RelationManagers\GeneratedDocumentsRelationManager;
 use App\Models\Company;
+use App\Models\LoanRequest;
 use App\Models\User;
 use App\Services\Documents\LoanDocumentProducer;
+use Illuminate\Support\Collection;
 use Livewire\Livewire;
 use Unico\Core\Models\Document;
 use Unico\Core\Models\DocumentRequirement;
@@ -14,7 +16,7 @@ use Unico\Core\Models\Task;
 
 class LoanRequestDocumentsPanelTest extends CoreTestCase
 {
-    /** @return array{0: \App\Models\LoanRequest, 1: \Illuminate\Support\Collection} */
+    /** @return array{0: LoanRequest, 1: Collection} */
     private function loanWithDocuments(int $docs = 2): array
     {
         $coreId = $this->coreCompany()->id;
@@ -59,7 +61,7 @@ class LoanRequestDocumentsPanelTest extends CoreTestCase
         $doc = $docs->first();
         $original = $doc->getFirstMedia(Document::COLLECTION)->file_name;
         $doc->addMediaFromString('%PDF-firmato')->usingFileName('firmato.pdf')->toMediaCollection(Document::COLLECTION_SIGNED);
-        $doc->update(['is_signed' => true]);
+        $doc->update(['is_signed' => true, 'signed_at' => now()]);
 
         $this->manager($loan)->callTableAction('scaricaOriginale', $doc)->assertFileDownloaded($original);
     }
