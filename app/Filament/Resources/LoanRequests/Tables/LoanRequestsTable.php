@@ -17,6 +17,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Unico\Core\Signature\PhoneNumber;
 
@@ -44,26 +45,30 @@ class LoanRequestsTable
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('code')->label('Codice')->searchable()->sortable(),
-                TextColumn::make('is_test')->label('Origine')->badge()->color(fn (bool $state) => $state ? 'warning' : 'gray')
+                TextColumn::make('is_test')->label('Origine')->badge()->sortable()->color(fn (bool $state) => $state ? 'warning' : 'gray')
                     ->formatStateUsing(fn (bool $state) => $state ? 'Prova' : 'Reale'),
                 TextColumn::make('agent_wa_number')->label('Agente')->searchable()
+                    ->sortable(query: fn (Builder $query, string $direction) => $query->orderBy(Fornitore::nameByWhatsAppSql('loan_requests.agent_wa_number'), $direction))
                     ->state(fn (LoanRequest $record) => self::agentNames()[PhoneNumber::national($record->agent_wa_number)] ?? $record->agent_wa_number)
                     ->tooltip(fn (LoanRequest $record) => $record->agent_wa_number),
-                TextColumn::make('product')->label('Prodotto')
+                TextColumn::make('product')->label('Prodotto')->sortable()
                     ->formatStateUsing(fn (string $state, LoanRequest $record) => LoanRequest::productLabels($record->company_id)[$state] ?? $state),
-                TextColumn::make('signature_status')->label('Firma')->badge()->toggleable()
+                TextColumn::make('signature_status')->label('Firma')->badge()->sortable()->toggleable()
                     ->formatStateUsing(fn (?string $state) => LoanRequest::SIGNATURE_STATUSES[$state] ?? '-'),
-                TextColumn::make('status')->label('Stato')->badge()
+                TextColumn::make('status')->label('Stato')->badge()->sortable()
                     ->formatStateUsing(fn (string $state) => LoanRequest::STATUSES[$state] ?? $state),
                 TextColumn::make('privacy_received_at')->label('Informativa')->dateTime()->sortable()->placeholder('-'),
                 TextColumn::make('perfected_at')->label('Perfezionata')->dateTime()->sortable()->placeholder('-'),
-                TextColumn::make('attachments_sum_ai_cost')->label('Costo AI')->sum('attachments', 'ai_cost')
+                TextColumn::make('attachments_sum_ai_cost')->label('Costo AI')->sum('attachments', 'ai_cost')->sortable()
                     ->formatStateUsing(fn ($state) => Attachment::formatCost($state))->placeholder('-')->toggleable(),
-                TextColumn::make('emailed_at')->label('Inviata per email')->dateTime()->placeholder('-')->toggleable(),
+                TextColumn::make('emailed_at')->label('Inviata per email')->dateTime()->sortable()->placeholder('-')->toggleable(),
                 TextColumn::make('created_at')->label('Creata')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 CurrentCompany::filter(),
+                SelectFilter::make('agent')->label('Agente')->searchable()
+                    ->options(fn () => Fornitore::query()->whereNotNull('tel')->orderBy('name')->pluck('name', 'id')->all())
+                    ->query(fn (Builder $query, array $data): Builder => Fornitore::whereWhatsAppOf($query, 'agent_wa_number', $data['value'] ?? null)),
                 SelectFilter::make('status')->label('Stato')->options(LoanRequest::STATUSES),
                 TernaryFilter::make('is_test')->label('Origine')->trueLabel('Prova')->falseLabel('Reali'),
                 SelectFilter::make('product')->label('Prodotto')->options(fn () => LoanRequest::productLabels(CurrentCompany::id())),

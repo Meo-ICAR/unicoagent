@@ -144,6 +144,44 @@ class FilamentAdminTest extends TestCase
             ->assertTableColumnStateSet('agent_wa_number', '393339999999', $unknown);
     }
 
+    public function test_le_pratiche_si_filtrano_e_si_ordinano_per_agente(): void
+    {
+        Fornitore::create(['name' => 'Agenzia Bianchi', 'tel' => '+39 333 111 2222', 'is_active' => true]);
+        $rossi = Fornitore::create(['name' => 'Agenzia Rossi', 'tel' => '3339999999', 'is_active' => true]);
+        $bianchi = $this->loan();
+        $second = LoanRequest::create(['code' => 'FIN-2026-0002', 'agent_wa_number' => '393339999999', 'product' => 'personale', 'status' => 'richiesta', 'answers' => []]);
+        $this->login();
+
+        Livewire::test(ListLoanRequests::class)
+            ->filterTable('agent', $rossi->id)
+            ->assertCanSeeTableRecords([$second])
+            ->assertCanNotSeeTableRecords([$bianchi])
+            ->removeTableFilters()
+            ->sortTable('agent_wa_number', 'desc')
+            ->assertCanSeeTableRecords([$second, $bianchi], inOrder: true)
+            ->sortTable('agent_wa_number', 'asc')
+            ->assertCanSeeTableRecords([$bianchi, $second], inOrder: true);
+    }
+
+    public function test_ogni_colonna_ordinabile_di_pratiche_e_conversazioni_si_ordina_senza_errori(): void
+    {
+        $loan = $this->loan();
+        Conversation::create(['wa_number' => '393331112222', 'flow' => 'richiesta', 'node' => 'prodotto', 'loan_request_id' => $loan->id, 'data' => [], 'history' => []]);
+        $this->login();
+
+        foreach ([ListLoanRequests::class, ListConversations::class] as $page) {
+            $component = Livewire::test($page);
+            $columns = collect($component->instance()->getTable()->getColumns())->filter->isSortable()->keys();
+
+            $this->assertNotEmpty($columns);
+            foreach ($columns as $name) {
+                foreach (['asc', 'desc'] as $direction) {
+                    $component->sortTable($name, $direction)->assertSuccessful();
+                }
+            }
+        }
+    }
+
     public function test_le_pratiche_si_eliminano_in_blocco_e_le_conversazioni_restano_senza_pratica(): void
     {
         $loan = $this->loan();

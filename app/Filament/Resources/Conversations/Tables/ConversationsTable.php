@@ -13,9 +13,6 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Query\Expression;
-use Illuminate\Support\Facades\DB;
-use Unico\Core\Signature\PhoneNumber;
 
 class ConversationsTable
 {
@@ -30,12 +27,12 @@ class ConversationsTable
             ->columns([
                 TextColumn::make('wa_number')->label('Telefono')->searchable()->sortable(),
                 TextColumn::make('fornitore')->label('Produttore')->placeholder('-')->state(fn ($record) => $record->fornitore?->display_name)
-                    ->sortable(query: fn (Builder $query, string $direction) => $query->orderBy(self::fornitoreNameQuery(), $direction)),
-                TextColumn::make('flow')->label('Percorso')->formatStateUsing(fn (string $state) => self::FLOWS[$state] ?? $state),
-                TextColumn::make('node')->label('Domanda corrente'),
-                TextColumn::make('status')->label('Stato')->badge()->formatStateUsing(fn (string $state) => self::STATUSES[$state] ?? $state),
+                    ->sortable(query: fn (Builder $query, string $direction) => $query->orderBy(Fornitore::nameByWhatsAppSql('conversations.wa_number'), $direction)),
+                TextColumn::make('flow')->label('Percorso')->sortable()->formatStateUsing(fn (string $state) => self::FLOWS[$state] ?? $state),
+                TextColumn::make('node')->label('Domanda corrente')->sortable(),
+                TextColumn::make('status')->label('Stato')->badge()->sortable()->formatStateUsing(fn (string $state) => self::STATUSES[$state] ?? $state),
                 TextColumn::make('messages_count')->label('Iterazioni')->counts('messages')->badge()->color('gray')->sortable(),
-                TextColumn::make('loanRequest.code')->label('Pratica')->placeholder('-'),
+                TextColumn::make('loanRequest.code')->label('Pratica')->placeholder('-')->sortable(),
                 TextColumn::make('updated_at')->label('Ultimo messaggio')->dateTime()->sortable(),
             ])
             ->filters([
@@ -44,14 +41,7 @@ class ConversationsTable
                 CurrentCompany::filter(),
                 SelectFilter::make('fornitore')->label('Produttore')->searchable()
                     ->options(fn () => Fornitore::query()->whereNotNull('tel')->orderBy('name')->pluck('name', 'id')->all())
-                    ->query(function (Builder $query, array $data): Builder {
-                        $tel = filled($data['value'] ?? null) ? Fornitore::find($data['value'])?->tel : null;
-                        $national = filled($tel) ? PhoneNumber::national($tel) : '';
-
-                        return filled($data['value'] ?? null)
-                            ? $query->where('wa_number', 'like', '%'.($national !== '' ? $national : '#nessuno#'))
-                            : $query;
-                    }),
+                    ->query(fn (Builder $query, array $data): Builder => Fornitore::whereWhatsAppOf($query, 'wa_number', $data['value'] ?? null)),
                 SelectFilter::make('status')->label('Stato')->options(self::STATUSES),
                 Filter::make('wa_number')->label('Telefono')
                     ->schema([TextInput::make('wa_number')->label('Telefono')])
@@ -64,14 +54,5 @@ class ConversationsTable
             ])
             ->recordActions([ViewAction::make()])
             ->toolbarActions([BulkActionGroup::make([DeleteBulkAction::make()])]);
-    }
-
-    /** Il nome del produttore con lo stesso telefono (ultime 10 cifre), per ordinare la tabella. */
-    private static function fornitoreNameQuery(): Expression
-    {
-        $fornitore = new Fornitore;
-        $table = $fornitore->getConnection()->getDatabaseName().'.'.$fornitore->getTable();
-
-        return DB::raw("(select min(f.name) from {$table} f where f.deleted_at is null and f.tel is not null and right(regexp_replace(f.tel, '[^0-9]', ''), 10) = right(conversations.wa_number, 10))");
     }
 }

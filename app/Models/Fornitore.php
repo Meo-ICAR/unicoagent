@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Query\Expression;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Unico\Core\Models\Fornitore as CoreFornitore;
 use Unico\Core\Signature\PhoneNumber;
@@ -118,6 +120,27 @@ class Fornitore extends CoreFornitore
         }
 
         return static::create(['tel' => $waNumber, 'name' => 'Demo '.$wanted, 'type' => self::DEMO_TYPE, 'is_active' => true, static::companyColumn() => $companyId]);
+    }
+
+    /** Il nome del produttore con lo stesso telefono (ultime 10 cifre) del numero WhatsApp della colonna: per ordinare le tabelle. */
+    public static function nameByWhatsAppSql(string $waColumn): Expression
+    {
+        $fornitore = new static;
+        $table = $fornitore->getConnection()->getDatabaseName().'.'.$fornitore->getTable();
+
+        return DB::raw("(select min(f.name) from {$table} f where f.deleted_at is null and f.tel is not null and right(regexp_replace(f.tel, '[^0-9]', ''), 10) = right({$waColumn}, 10))");
+    }
+
+    /** Limita le righe a quelle il cui numero WhatsApp (colonna) è il telefono del produttore indicato. */
+    public static function whereWhatsAppOf(Builder $query, string $waColumn, mixed $fornitoreId): Builder
+    {
+        if (blank($fornitoreId)) {
+            return $query;
+        }
+
+        $national = self::nationalNumber((string) static::find($fornitoreId)?->tel);
+
+        return $query->where($waColumn, 'like', '%'.($national !== '' ? $national : '#nessuno#'));
     }
 
     /** Solo cifre, senza prefisso internazionale italiano (+39 / 0039). */
