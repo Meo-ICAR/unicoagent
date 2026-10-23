@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\Fornitore;
 use App\Models\LoanRequest;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -21,7 +22,7 @@ class QuoteMail extends Mailable
 
     public function content(): Content
     {
-        $lines = ["Richiesta di preventivo {$this->loan->code}", 'Agente (WhatsApp): '.$this->loan->agent_wa_number, ''];
+        $lines = ["Richiesta di preventivo {$this->loan->code}", 'Agente (WhatsApp): '.Fornitore::whatsAppLabel((string) $this->loan->agent_wa_number), ''];
         foreach (LoanRequest::describe($this->loan->answers, 'richiesta', $this->loan->company_id) as $label => $value) {
             $lines[] = "- {$label}: {$value}";
         }

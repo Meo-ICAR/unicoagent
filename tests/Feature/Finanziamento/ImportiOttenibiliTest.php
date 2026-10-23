@@ -131,6 +131,7 @@ class ImportiOttenibiliTest extends ConversationTestCase
         Mail::assertSent(QuoteMail::class, function ($m) {
             $m->assertHasTo('istruttoria@example.com');
             $m->assertSeeInHtml('Prestito personale');
+            $m->assertSeeInHtml('Agente (WhatsApp): Agenzia Bianchi 393331112222');
 
             return $m->hasSubject('Preventivo '.LoanRequest::first()->code.' · Prestito personale');
         });

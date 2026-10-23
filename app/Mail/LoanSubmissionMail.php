@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Attachment;
+use App\Models\Fornitore;
 use App\Models\LoanRequest;
 use App\Models\PraticaDocument;
 use Illuminate\Mail\Mailable;
@@ -40,7 +41,7 @@ class LoanSubmissionMail extends Mailable
     private function body(): string
     {
         $loan = $this->loan;
-        $lines = ["Pratica {$loan->code}", 'Stato: '.(LoanRequest::STATUSES[$loan->status] ?? $loan->status), 'Agente (WhatsApp): '.$loan->agent_wa_number, ''];
+        $lines = ["Pratica {$loan->code}", 'Stato: '.(LoanRequest::STATUSES[$loan->status] ?? $loan->status), 'Agente (WhatsApp): '.Fornitore::whatsAppLabel((string) $loan->agent_wa_number), ''];
 
         $sections = [
             'Richiesta' => LoanRequest::describe($loan->answers, 'richiesta', $loan->company_id),

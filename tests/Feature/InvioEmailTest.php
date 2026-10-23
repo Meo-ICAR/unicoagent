@@ -6,6 +6,7 @@ use App\Filament\Resources\LoanRequests\Pages\ListLoanRequests;
 use App\Mail\LoanSubmissionMail;
 use App\Models\Attachment;
 use App\Models\Company;
+use App\Models\Fornitore;
 use App\Models\LoanRequest;
 use App\Models\User;
 use App\Services\Crm\LoanEmailSender;
@@ -57,6 +58,22 @@ class InvioEmailTest extends TestCase
             return count($m->attachments()) === 1 && $m->hasSubject('Pratica FIN-2026-0001 · Prestito personale');
         });
         $this->assertNotNull($loan->fresh()->emailed_at);
+    }
+
+    public function test_prima_del_telefono_indica_il_nome_dell_agente(): void
+    {
+        config(['finanziamento.mail.to' => 'x@example.com']);
+        Fornitore::create(['name' => 'Agenzia Bianchi', 'nome' => 'Luca Bianchi', 'tel' => '+39 333 111 2222', 'is_active' => false]);
+        $loan = $this->loan();
+        $loan->update(['agent_wa_number' => '393331112222']);
+
+        $this->assertTrue(app(LoanEmailSender::class)->send($loan->fresh()));
+
+        Mail::assertSent(LoanSubmissionMail::class, function (LoanSubmissionMail $m) {
+            $m->assertSeeInHtml('Agente (WhatsApp): Agenzia Bianchi 393331112222');
+
+            return true;
+        });
     }
 
     public function test_usa_la_casella_di_configurazione_se_manca_quella_dell_azienda(): void

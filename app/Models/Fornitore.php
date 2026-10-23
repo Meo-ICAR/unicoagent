@@ -72,6 +72,26 @@ class Fornitore extends CoreFornitore
         return filled($this->name) ? $this->name : $this->nome;
     }
 
+    /**
+     * Nome del produttore (denominazione, altrimenti referente) da anteporre al numero WhatsApp.
+     * Vale anche per chi non è più attivo: in email serve comunque a riconoscerlo.
+     */
+    public static function whatsAppLabel(string $waNumber): string
+    {
+        $wanted = self::nationalNumber($waNumber);
+        if ($wanted === '') {
+            return $waNumber;
+        }
+
+        $name = static::query()->whereNotNull('tel')->get()
+            ->filter(fn (self $f) => self::nationalNumber((string) $f->tel) === $wanted)
+            ->sortBy(fn (self $f) => $f->is_active ? 0 : 1)
+            ->map(fn (self $f) => $f->display_name)
+            ->first(fn (?string $name) => filled($name));
+
+        return filled($name) ? $name.' '.$waNumber : $waNumber;
+    }
+
     /** L'agente attivo il cui telefono coincide con il numero WhatsApp, in qualunque formato siano scritti. */
     public static function findByWhatsApp(string $waNumber): ?self
     {

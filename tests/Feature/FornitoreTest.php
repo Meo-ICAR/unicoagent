@@ -61,6 +61,26 @@ class FornitoreTest extends TestCase
         $this->assertTrue($f->user->is($user));
     }
 
+    public function test_il_nome_del_produttore_precede_il_numero_anche_se_non_e_attivo(): void
+    {
+        Fornitore::create(['name' => 'Agenzia Bianchi', 'tel' => '+39 333 111 2222', 'is_active' => false]);
+
+        $this->assertSame('Agenzia Bianchi 393331112222', Fornitore::whatsAppLabel('393331112222'));
+    }
+
+    public function test_senza_anagrafica_resta_solo_il_numero(): void
+    {
+        $this->assertSame('393339998888', Fornitore::whatsAppLabel('393339998888'));
+    }
+
+    public function test_tra_due_anagrafiche_con_lo_stesso_numero_preferisce_quella_attiva(): void
+    {
+        Fornitore::create(['name' => 'Cessato', 'tel' => '3331112222', 'is_active' => false]);
+        Fornitore::create(['name' => 'Attivo', 'tel' => '+39 333 111 2222', 'is_active' => true]);
+
+        $this->assertSame('Attivo 393331112222', Fornitore::whatsAppLabel('393331112222'));
+    }
+
     public function test_trova_l_agente_dal_numero_whatsapp_qualunque_sia_il_formato_del_telefono(): void
     {
         $f = Fornitore::create(['name' => 'Mario Rossi', 'tel' => '+39 333 111 2222']);
